@@ -59,6 +59,12 @@ android {
     buildFeatures {
         compose = true
     }
+
+    androidResources {
+        // .nnue files are pre-quantized neural-net weights — recompressing them
+        // gains nothing and just makes asset extraction slower.
+        noCompress += "nnue"
+    }
 }
 
 dependencies {

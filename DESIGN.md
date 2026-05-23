@@ -126,10 +126,34 @@ A settings screen must include a "headphone button test" page that logs every re
 ## Build notes
 
 ### Stockfish JNI
-- Source: official Stockfish repository.
-- Build via NDK with CMake for `arm64-v8a` and `armeabi-v7a`.
-- Thin Kotlin wrapper that pipes UCI strings in and parses `bestmove` lines out.
-- Skill level mapped to user-facing scale: "beginner" / "club" / "strong" / "master", or numeric 1–20.
+- Source: official Stockfish repository, vendored as a git submodule under
+  `app/src/main/cpp/stockfish` pinned to a release tag (currently `sf_18`).
+- Build via NDK with CMake. `arm64-v8a` only for v1 (covers nearly every modern phone
+  and halves APK size); add `armeabi-v7a` later if a tester actually needs it.
+- The bridge (`stockfish_bridge.cpp`) embeds the engine on a worker thread and
+  `dup2`'s pipes onto `STDIN`/`STDOUT` so we can drive `UCIEngine::loop()` from
+  Kotlin via byte-level reads/writes. `StockfishJni.kt` is the low-level Kotlin
+  surface; `StockfishEngine.kt` provides high-level UCI methods (`handshake`,
+  `setPosition`, `goMoveTime`, ...) with `onSubscription`-based response awaits.
+- Skill level mapped to user-facing scale: "beginner" / "club" / "strong" /
+  "master", or numeric 1–20 (Stockfish `Skill Level` UCI option).
+
+### NNUE network files
+- Stockfish 18 evaluation requires two NNUE files: `EvalFile` (~104 MB, "big") and
+  `EvalFileSmall` (~3.4 MB). The default filenames are defined in
+  `stockfish/src/evaluate.h` and pinned per release.
+- Bundled as APK assets under `app/src/main/assets/` and extracted to internal
+  storage on first use by `EngineAssets.kt`; then injected via
+  `setoption name EvalFile value <abs-path>`.
+- **Not** checked into git (gitignored by `*.nnue` pattern) — they're large
+  binaries fetched separately. After a fresh clone:
+  ```bash
+  ./scripts/fetch_nnue.sh
+  ```
+  This downloads from `tests.stockfishchess.org`.
+- APK size impact: ~108 MB. Acceptable for sideloaded dev builds. For Play
+  Store distribution this should move to Play Asset Delivery before v1.0.
+- AGP `noCompress += "nnue"` to avoid re-compressing already-quantized weights.
 
 ### Vosk
 - Use the Alpha Cephei Android demo as starting reference.

@@ -33,18 +33,30 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.blindfoldchess.app.engine.EngineAssets
+import com.blindfoldchess.app.engine.StockfishEngine
 import com.blindfoldchess.app.engine.StockfishJni
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EngineSelfTestScreen(onBack: () -> Unit) {
-    val engine = remember { StockfishJni() }
+    val context = LocalContext.current
+    val jni = remember { StockfishJni() }
+    val engine = remember { StockfishEngine(jni) }
+    val assets = remember { EngineAssets(context) }
+
     val lines = remember { mutableStateListOf<String>() }
-    var running by remember { mutableStateOf(false) }
+    var started by remember { mutableStateOf(false) }
+    var bestmove by remember { mutableStateOf<String?>(null) }
+    var lastError by remember { mutableStateOf<String?>(null) }
     var commandInput by remember { mutableStateOf("uci") }
+
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
@@ -52,8 +64,8 @@ fun EngineSelfTestScreen(onBack: () -> Unit) {
         derivedStateOf { lines.any { it.startsWith("id name Stockfish") } }
     }
 
-    LaunchedEffect(engine) {
-        engine.output.collect { lines.add(it) }
+    LaunchedEffect(jni) {
+        jni.output.collect { lines.add(it) }
     }
 
     LaunchedEffect(lines.size) {
@@ -63,9 +75,11 @@ fun EngineSelfTestScreen(onBack: () -> Unit) {
     }
 
     DisposableEffect(engine) {
-        onDispose {
-            if (running) engine.stop()
-        }
+        onDispose { if (started) engine.stop() }
+    }
+
+    fun appendHost(msg: String) {
+        lines.add("[host] $msg")
     }
 
     Scaffold(
@@ -78,7 +92,11 @@ fun EngineSelfTestScreen(onBack: () -> Unit) {
                     }
                 },
                 actions = {
-                    TextButton(onClick = { lines.clear() }) { Text("Clear") }
+                    TextButton(onClick = {
+                        lines.clear()
+                        bestmove = null
+                        lastError = null
+                    }) { Text("Clear") }
                 },
             )
         },
@@ -91,34 +109,73 @@ fun EngineSelfTestScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "Loads libstockfish_bridge.so, spawns the embedded UCI engine, " +
-                    "and pipes commands to its stdin / lines from its stdout. Tap Start " +
-                    "and confirm an \"id name Stockfish\" line appears.",
+                text = "Phase 2a: \"Start + handshake\" verifies the libstockfish_bridge.so " +
+                    "build and UCI handshake.\nPhase 2b: \"Play first move\" extracts NNUE " +
+                    "assets, sets EvalFile options, and runs a 200ms search from the start " +
+                    "position; you should see a bestmove like e2e4.",
                 style = MaterialTheme.typography.bodyMedium,
             )
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (running) {
+                if (started) {
                     Button(onClick = {
                         engine.stop()
-                        running = false
+                        started = false
                     }) { Text("Stop engine") }
                 } else {
                     Button(onClick = {
-                        if (engine.start()) {
-                            running = true
-                            scope.launch { engine.send("uci") }
-                        } else {
-                            lines.add("[host] nativeStart() returned false")
+                        scope.launch {
+                            try {
+                                engine.start()
+                                started = true
+                            } catch (t: Throwable) {
+                                appendHost("start failed: ${t.message}")
+                                lastError = t.message
+                            }
                         }
-                    }) { Text("Start + send \"uci\"") }
+                    }) { Text("Start + handshake") }
                 }
+                Button(
+                    enabled = started && handshakeOk,
+                    onClick = {
+                        scope.launch {
+                            bestmove = null
+                            lastError = null
+                            try {
+                                val nnue = withContext(Dispatchers.IO) { assets.ensureExtracted() }
+                                if (nnue == null) {
+                                    appendHost("NNUE files missing — run scripts/fetch_nnue.sh and rebuild")
+                                } else {
+                                    appendHost("NNUE: big=${nnue.big.absolutePath}")
+                                    appendHost("NNUE: small=${nnue.small.absolutePath}")
+                                    engine.setOption("EvalFile", nnue.big.absolutePath)
+                                    engine.setOption("EvalFileSmall", nnue.small.absolutePath)
+                                }
+                                engine.newGame()
+                                engine.setPosition(startFen = null, moves = emptyList())
+                                val mv = engine.goMoveTime(200)
+                                bestmove = mv
+                                appendHost("bestmove → $mv")
+                            } catch (t: Throwable) {
+                                appendHost("play failed: ${t.message}")
+                                lastError = t.message
+                            }
+                        }
+                    },
+                ) { Text("Play first move") }
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 if (handshakeOk) {
-                    Text(
-                        text = "handshake ok",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
+                    Text("handshake ok", style = MaterialTheme.typography.bodyMedium)
+                }
+                bestmove?.let {
+                    Text("bestmove: $it", style = MaterialTheme.typography.titleSmall)
+                }
+                lastError?.let {
+                    Text("error: $it", style = MaterialTheme.typography.bodySmall)
                 }
             }
 
@@ -131,17 +188,15 @@ fun EngineSelfTestScreen(onBack: () -> Unit) {
                     onValueChange = { commandInput = it },
                     label = { Text("UCI command") },
                     singleLine = true,
-                    enabled = running,
+                    enabled = started,
                     modifier = Modifier.weight(1f),
                 )
                 Button(
                     onClick = {
                         val cmd = commandInput.trim()
-                        if (cmd.isNotEmpty()) {
-                            scope.launch { engine.send(cmd) }
-                        }
+                        if (cmd.isNotEmpty()) scope.launch { jni.send(cmd) }
                     },
-                    enabled = running,
+                    enabled = started,
                 ) { Text("Send") }
             }
 

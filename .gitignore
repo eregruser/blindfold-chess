@@ -13,3 +13,7 @@ local.properties
 
 # Claude Code metadata — uncomment to share agent/skill config across machines
 .claude/
+
+# Stockfish NNUE network files. Large (~108MB combined); fetched separately
+# via scripts/fetch_nnue.sh after clone so they don't bloat git history.
+app/src/main/assets/*.nnue
