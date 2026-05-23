@@ -9,6 +9,7 @@ object Routes {
     const val Main = "main"
     const val Settings = "settings"
     const val HeadphoneTest = "settings/headphone_test"
+    const val EngineSelfTest = "settings/engine_self_test"
 }
 
 @Composable
@@ -21,11 +22,15 @@ fun AppNavHost() {
         composable(Routes.Settings) {
             SettingsScreen(
                 onOpenHeadphoneTest = { nav.navigate(Routes.HeadphoneTest) },
+                onOpenEngineSelfTest = { nav.navigate(Routes.EngineSelfTest) },
                 onBack = { nav.popBackStack() },
             )
         }
         composable(Routes.HeadphoneTest) {
             HeadphoneTestScreen(onBack = { nav.popBackStack() })
+        }
+        composable(Routes.EngineSelfTest) {
+            EngineSelfTestScreen(onBack = { nav.popBackStack() })
         }
     }
 }

@@ -7,6 +7,7 @@ plugins {
 android {
     namespace = "com.blindfoldchess.app"
     compileSdk = 35
+    ndkVersion = "30.0.14904198"
 
     defaultConfig {
         applicationId = "com.blindfoldchess.app"
@@ -14,6 +15,26 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+
+        ndk {
+            // Stockfish JNI is built for 64-bit ARM only — covers ~all phones from
+            // the last several years and halves APK size. Add armeabi-v7a / x86_64
+            // here later if a tester actually needs them.
+            abiFilters += "arm64-v8a"
+        }
+
+        externalNativeBuild {
+            cmake {
+                arguments += "-DANDROID_STL=c++_shared"
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "4.1.2"
+        }
     }
 
     buildTypes {

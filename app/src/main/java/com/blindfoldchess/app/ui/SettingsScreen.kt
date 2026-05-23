@@ -19,7 +19,11 @@ import androidx.compose.ui.Modifier
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onOpenHeadphoneTest: () -> Unit, onBack: () -> Unit) {
+fun SettingsScreen(
+    onOpenHeadphoneTest: () -> Unit,
+    onOpenEngineSelfTest: () -> Unit,
+    onBack: () -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -41,6 +45,12 @@ fun SettingsScreen(onOpenHeadphoneTest: () -> Unit, onBack: () -> Unit) {
                 headlineContent = { Text("Headphone button test") },
                 supportingContent = { Text("Log every media key event received from a connected headset") },
                 modifier = Modifier.clickable(onClick = onOpenHeadphoneTest),
+            )
+            HorizontalDivider()
+            ListItem(
+                headlineContent = { Text("Engine self-test") },
+                supportingContent = { Text("Load embedded Stockfish and drive it via UCI commands") },
+                modifier = Modifier.clickable(onClick = onOpenEngineSelfTest),
             )
             HorizontalDivider()
         }
