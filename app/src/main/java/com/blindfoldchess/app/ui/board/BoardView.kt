@@ -1,6 +1,8 @@
 package com.blindfoldchess.app.ui.board
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
@@ -9,8 +11,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -21,29 +25,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color as UiColor
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.blindfoldchess.app.R
 import com.blindfoldchess.app.chess.Board
 import com.blindfoldchess.app.chess.Color
 import com.blindfoldchess.app.chess.Piece
 import com.blindfoldchess.app.chess.PieceType
 
 /**
- * 8×8 board renderer. Square colors alternate; rank labels run down the left edge and file
- * labels along the bottom. Pieces use Unicode glyphs (♔♕♖♗♘♙ / ♚♛♜♝♞♟). Fogged squares
- * render as solid gray with no piece glyph.
+ * 8×8 board renderer. Cells alternate cream/brown; rank labels run down the left edge,
+ * file labels along the bottom. Pieces render as the Cburnett vector drawables (the same
+ * piece set Lichess ships as its default — Colin Burnett, CC-BY-SA 3.0).
  *
  * Tap toggles fog; long-press is forwarded as the move-selection gesture (caller decides
  * whether to select, move, or ignore based on game state).
- *
- * @param board current position. null is treated as an empty board.
- * @param fogged set of square names (e.g. "e4") to hide.
- * @param selectedSquare currently-selected source square for a long-press move, or null.
- * @param legalTargets squares the selected piece can legally move to. Empty when no selection.
- * @param onSquareTap fired on single tap. Caller typically toggles fog.
- * @param onSquareLongPress fired on long-press. Caller drives the move state machine.
- * @param userColor controls orientation — user's rank 1 sits at the bottom.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -101,14 +97,14 @@ fun BoardView(
                         contentAlignment = Alignment.Center,
                     ) {
                         if (!isFogged && piece != null) {
-                            Text(
-                                text = piece.glyph().toString(),
-                                fontSize = 38.sp,
-                                fontWeight = FontWeight.Normal,
-                                color = if (piece.color == Color.White) WHITE_PIECE else BLACK_PIECE,
+                            Image(
+                                painter = painterResource(id = piece.drawableRes()),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(2.dp),
                             )
                         }
-                        // Legal-target indicator: small filled dot on top of background/piece.
                         if (isTarget) {
                             Box(
                                 modifier = Modifier
@@ -148,22 +144,23 @@ private fun squareColor(isLight: Boolean, isFogged: Boolean): UiColor = when {
     else -> DARK_SQ
 }
 
-private fun Piece.glyph(): Char = when (color) {
+@DrawableRes
+private fun Piece.drawableRes(): Int = when (color) {
     Color.White -> when (type) {
-        PieceType.King -> '♔'
-        PieceType.Queen -> '♕'
-        PieceType.Rook -> '♖'
-        PieceType.Bishop -> '♗'
-        PieceType.Knight -> '♘'
-        PieceType.Pawn -> '♙'
+        PieceType.King -> R.drawable.piece_wk
+        PieceType.Queen -> R.drawable.piece_wq
+        PieceType.Rook -> R.drawable.piece_wr
+        PieceType.Bishop -> R.drawable.piece_wb
+        PieceType.Knight -> R.drawable.piece_wn
+        PieceType.Pawn -> R.drawable.piece_wp
     }
     Color.Black -> when (type) {
-        PieceType.King -> '♚'
-        PieceType.Queen -> '♛'
-        PieceType.Rook -> '♜'
-        PieceType.Bishop -> '♝'
-        PieceType.Knight -> '♞'
-        PieceType.Pawn -> '♟'
+        PieceType.King -> R.drawable.piece_bk
+        PieceType.Queen -> R.drawable.piece_bq
+        PieceType.Rook -> R.drawable.piece_br
+        PieceType.Bishop -> R.drawable.piece_bb
+        PieceType.Knight -> R.drawable.piece_bn
+        PieceType.Pawn -> R.drawable.piece_bp
     }
 }
 
@@ -173,7 +170,5 @@ private val LIGHT_SQ = UiColor(0xFFF0D9B5)
 private val DARK_SQ = UiColor(0xFFB58863)
 private val FOG_LIGHT = UiColor(0xFF8A8A8A)
 private val FOG_DARK = UiColor(0xFF5C5C5C)
-private val WHITE_PIECE = UiColor(0xFFFFFFFF)
-private val BLACK_PIECE = UiColor(0xFF000000)
 private val SELECTED_BORDER = UiColor(0xFF4CAF50)
 private val TARGET_DOT = UiColor(0xCC4CAF50)
