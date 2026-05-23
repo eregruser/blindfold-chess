@@ -9,6 +9,8 @@ navigation = "2.8.3"
 media = "1.7.0"
 vosk = "0.3.75"
 junit = "4.13.2"
+room = "2.6.1"
+ksp = "2.0.21-1.0.28"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -28,7 +30,12 @@ androidx-media = { group = "androidx.media", name = "media", version.ref = "medi
 vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

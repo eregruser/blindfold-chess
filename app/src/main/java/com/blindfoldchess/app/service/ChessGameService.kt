@@ -19,6 +19,7 @@ import android.view.KeyEvent
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.media.app.NotificationCompat as MediaNotificationCompat
+import com.blindfoldchess.app.BlindfoldChessApp
 import com.blindfoldchess.app.MainActivity
 import com.blindfoldchess.app.R
 import com.blindfoldchess.app.engine.GameController
@@ -60,7 +61,8 @@ class ChessGameService : Service() {
         earcons = Earcons()
         // gameController must be initialized before sessionAudio's callbacks fire — both
         // closures capture it as a lateinit reference and dispatch to it at runtime.
-        gameController = GameController(applicationContext, tts, earcons)
+        val app = applicationContext as BlindfoldChessApp
+        gameController = GameController(applicationContext, tts, earcons, app.gameRepository)
         sessionAudio = SessionAudio(
             applicationContext,
             onPermanentLoss = {

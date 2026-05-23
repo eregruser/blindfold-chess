@@ -5,6 +5,8 @@ import android.util.Log
 import com.blindfoldchess.app.chess.Board
 import com.blindfoldchess.app.chess.Color
 import com.blindfoldchess.app.chess.PieceType
+import com.blindfoldchess.app.data.GameRepository
+import com.blindfoldchess.app.data.GameResult
 import com.blindfoldchess.app.service.Earcons
 import com.blindfoldchess.app.service.TtsManager
 import com.blindfoldchess.app.voice.ChessGrammar
@@ -48,6 +50,7 @@ class GameController(
     private val context: Context,
     private val tts: TtsManager,
     private val earcons: Earcons,
+    private val repo: GameRepository,
 ) {
 
     enum class Status { Idle, Loading, WaitingForUser, Listening, Thinking, GameOver, Error }
@@ -80,6 +83,9 @@ class GameController(
     private val gameLock = Mutex()
     private var listenJob: Job? = null
 
+    /** DB row id of the currently-active game, or null between games. */
+    private var currentGameId: Long? = null
+
     /** Boots engine + recognizer and announces "your move". Idempotent vs. concurrent calls. */
     suspend fun startGame() = gameLock.withLock {
         val cur = _state.value.status
@@ -94,10 +100,16 @@ class GameController(
             } else {
                 Log.w(TAG, "NNUE not bundled — engine will use degraded eval")
             }
+            engine.setOption("Skill Level", DEFAULT_SKILL.toString())
             engine.newGame()
             recognizer.ensureModel()
             engine.setPosition(startFen = null, moves = emptyList())
             val initialLegal = engine.perft(1)
+
+            // Abandon any previously-active game and create a fresh row for this session.
+            abandonAnyActiveGame()
+            currentGameId = repo.startNewGame(skillLevel = DEFAULT_SKILL)
+
             _state.update {
                 State(status = Status.WaitingForUser, legalMoves = initialLegal)
             }
@@ -108,12 +120,24 @@ class GameController(
         }
     }
 
+    private suspend fun abandonAnyActiveGame() {
+        val active = repo.findActive() ?: return
+        Log.i(TAG, "Marking previously-active game ${active.id} as Abandoned")
+        repo.markComplete(active.id, GameResult.Abandoned)
+    }
+
     /** Stops engine/recognizer and resets to Idle. Safe to call from any state. */
     fun stopGame() {
         scope.launch {
             gameLock.withLock {
                 listenJob?.cancel()
                 listenJob = null
+                // If we were mid-game (not already terminated), record as Abandoned.
+                val id = currentGameId
+                if (id != null && _state.value.status != Status.GameOver) {
+                    runCatching { repo.markComplete(id, GameResult.Abandoned) }
+                }
+                currentGameId = null
                 runCatching { recognizer.stopListening() }
                 runCatching { engine.stop() }
                 _state.value = State(status = Status.Idle)
@@ -261,6 +285,7 @@ class GameController(
                 message = null,
             )
         }
+        persistMoves()
         tts.speak("taken back")
     }
 
@@ -288,7 +313,7 @@ class GameController(
         tts.speak("white: $white. black: $black.")
     }
 
-    private fun handleResign() {
+    private suspend fun handleResign() = gameLock.withLock {
         _state.update {
             it.copy(
                 status = Status.GameOver,
@@ -296,13 +321,23 @@ class GameController(
                 message = "Resigned",
             )
         }
+        finalizeGame(GameResult.UserResigned)
         tts.speak("game over, you resigned")
     }
 
     private suspend fun handleNewGame() = gameLock.withLock {
+        // Abandon the in-progress game (if not already terminated) before creating a fresh row.
+        val previousId = currentGameId
+        if (previousId != null && _state.value.status != Status.GameOver) {
+            runCatching { repo.markComplete(previousId, GameResult.Abandoned) }
+        }
+        currentGameId = null
+
+        engine.setOption("Skill Level", DEFAULT_SKILL.toString())
         engine.newGame()
         engine.setPosition(startFen = null, moves = emptyList())
         val initialLegal = engine.perft(1)
+        currentGameId = repo.startNewGame(skillLevel = DEFAULT_SKILL)
         _state.value = State(status = Status.WaitingForUser, legalMoves = initialLegal)
         tts.speak("new game. your move.")
     }
@@ -368,8 +403,8 @@ class GameController(
             try {
                 engine.setPosition(startFen = null, moves = _state.value.moves)
                 val reply = engine.goMoveTime(ENGINE_MOVE_TIME_MS)
-                val gameOver = reply == "(none)" || reply == "0000" || reply.isBlank()
-                if (gameOver) {
+                val userMatedEngine = reply == "(none)" || reply == "0000" || reply.isBlank()
+                if (userMatedEngine) {
                     _state.update {
                         it.copy(
                             status = Status.GameOver,
@@ -378,24 +413,31 @@ class GameController(
                             message = "Game over",
                         )
                     }
+                    persistMoves()
+                    finalizeGame(GameResult.UserWin)
                     tts.speak("game over")
                 } else {
                     // Apply engine reply to position, then refresh legal moves for the next turn.
                     val newMoves = _state.value.moves + reply
                     engine.setPosition(startFen = null, moves = newMoves)
                     val nextLegal = engine.perft(1)
-                    val terminal = nextLegal.isEmpty()
+                    val userHasNoMoves = nextLegal.isEmpty()
                     _state.update {
                         it.copy(
-                            status = if (terminal) Status.GameOver else Status.WaitingForUser,
+                            status = if (userHasNoMoves) Status.GameOver else Status.WaitingForUser,
                             moves = newMoves,
                             lastEngineMove = reply,
                             legalMoves = nextLegal,
-                            message = if (terminal) "Game over" else null,
+                            message = if (userHasNoMoves) "Game over" else null,
                         )
                     }
+                    persistMoves()
+                    if (userHasNoMoves) {
+                        // Could be mate or stalemate — we don't distinguish for now (Phase 6+).
+                        finalizeGame(GameResult.UserLoss)
+                    }
                     tts.speak(MoveSpeech.spoken(reply))
-                    if (terminal) tts.speak("game over")
+                    if (userHasNoMoves) tts.speak("game over")
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "playUserMove failed", t)
@@ -404,9 +446,24 @@ class GameController(
         }
     }
 
+    /** Write the current move list to the active game row. No-op if no active game id. */
+    private suspend fun persistMoves() {
+        val id = currentGameId ?: return
+        runCatching { repo.recordMoves(id, _state.value.moves) }
+    }
+
+    /** Mark the current game complete with the given result. Clears currentGameId. */
+    private suspend fun finalizeGame(result: GameResult) {
+        val id = currentGameId ?: return
+        runCatching { repo.markComplete(id, result) }
+        currentGameId = null
+    }
+
     private companion object {
         const val TAG = "GameController"
         const val LISTEN_TIMEOUT_MS = 5_000L
         const val ENGINE_MOVE_TIME_MS = 500L
+        /** Default Stockfish "Skill Level" UCI option. Settings UI in Phase 7 will expose. */
+        const val DEFAULT_SKILL = 5
     }
 }
