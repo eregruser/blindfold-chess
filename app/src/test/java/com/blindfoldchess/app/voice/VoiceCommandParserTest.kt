@@ -61,6 +61,11 @@ class VoiceCommandParserTest {
         assertEquals(VoiceCommand.NewGame, parser.parse("new game"))
     }
 
+    @Test fun readMoves() {
+        assertEquals(VoiceCommand.ReadMoves, parser.parse("read moves"))
+        assertEquals(VoiceCommand.ReadMoves, parser.parse("read the moves"))
+    }
+
     @Test fun whatsOnWithApostrophe() {
         assertEquals(VoiceCommand.WhatsOn("e3"), parser.parse("what's on echo three"))
     }

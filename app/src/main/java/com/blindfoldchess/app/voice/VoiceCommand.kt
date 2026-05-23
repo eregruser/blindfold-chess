@@ -36,6 +36,9 @@ sealed class VoiceCommand {
 
     /** "what is on <square>" — announce piece (or empty) at the named square. */
     data class WhatsOn(val square: String) : VoiceCommand()
+
+    /** "read moves" — TTS every move in chronological order with a pause between each. */
+    object ReadMoves : VoiceCommand()
 }
 
 class VoiceCommandParser(private val moveParser: MoveParser = MoveParser()) {
@@ -116,6 +119,8 @@ class VoiceCommandParser(private val moveParser: MoveParser = MoveParser()) {
             "describe the board" to VoiceCommand.DescribeBoard,
             "resign" to VoiceCommand.Resign,
             "new game" to VoiceCommand.NewGame,
+            "read moves" to VoiceCommand.ReadMoves,
+            "read the moves" to VoiceCommand.ReadMoves,
         )
 
         val NATO_TO_FILE = mapOf(

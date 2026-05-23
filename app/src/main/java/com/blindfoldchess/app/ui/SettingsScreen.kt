@@ -26,6 +26,7 @@ fun SettingsScreen(
     onOpenGameHistory: () -> Unit,
     onOpenPreferences: () -> Unit,
     onOpenBoard: () -> Unit,
+    onOpenVoiceCommands: () -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -55,6 +56,12 @@ fun SettingsScreen(
                 headlineContent = { Text("Board view") },
                 supportingContent = { Text("Visualize the current position; tap squares to peek through fog") },
                 modifier = Modifier.clickable(onClick = onOpenBoard),
+            )
+            HorizontalDivider()
+            ListItem(
+                headlineContent = { Text("Voice commands") },
+                supportingContent = { Text("Cheat sheet of every phrase the recognizer accepts") },
+                modifier = Modifier.clickable(onClick = onOpenVoiceCommands),
             )
             HorizontalDivider()
             ListItem(

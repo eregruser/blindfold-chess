@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blindfoldchess.app.BlindfoldChessApp
+import com.blindfoldchess.app.chess.SanConverter
 import com.blindfoldchess.app.data.GameEntity
 import com.blindfoldchess.app.data.GameResult
 import com.blindfoldchess.app.engine.GameController
@@ -146,8 +147,11 @@ fun MainScreen(onOpenSettings: () -> Unit) {
                         modifier = Modifier.padding(8.dp),
                     )
                 } else {
+                    val sanMoves = remember(gameState.moves) {
+                        SanConverter.toSan(gameState.moves)
+                    }
                     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                        itemsIndexed(gameState.moves.chunked(2)) { idx, pair ->
+                        itemsIndexed(sanMoves.chunked(2)) { idx, pair ->
                             val moveNumber = idx + 1
                             val white = pair[0]
                             val black = pair.getOrNull(1) ?: ""

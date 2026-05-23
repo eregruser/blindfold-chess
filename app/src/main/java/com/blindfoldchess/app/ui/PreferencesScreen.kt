@@ -170,6 +170,7 @@ private fun NotationSection(
                             when (opt) {
                                 SettingsRepository.Notation.LetterByLetter -> "letter (e 7 e 5)"
                                 SettingsRepository.Notation.Nato -> "NATO (echo 7 echo 5)"
+                                SettingsRepository.Notation.Standard -> "standard (e5 / Nf3)"
                             }
                         )
                     },

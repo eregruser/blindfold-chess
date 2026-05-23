@@ -5,6 +5,8 @@ import android.util.Log
 import com.blindfoldchess.app.chess.Board
 import com.blindfoldchess.app.chess.Color
 import com.blindfoldchess.app.chess.PieceType
+import com.blindfoldchess.app.chess.SanConverter
+import com.blindfoldchess.app.chess.SanSpeech
 import com.blindfoldchess.app.data.GameRepository
 import com.blindfoldchess.app.data.GameResult
 import com.blindfoldchess.app.data.SettingsRepository
@@ -21,6 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -88,6 +91,10 @@ class GameController(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val gameLock = Mutex()
     private var listenJob: Job? = null
+
+    /** Coroutine running an in-progress "read moves" announcement. Canceled when the user
+     *  opens a new listen window or fires [cancelListenWindow] / [stopGame]. */
+    private var readJob: Job? = null
 
     /** DB row id of the currently-active game, or null between games. */
     private var currentGameId: Long? = null
@@ -194,7 +201,7 @@ class GameController(
             refreshBoard()
             tts.speak("game resumed")
             if (lastEngineMove != null) {
-                tts.speak("last engine move: ${MoveSpeech.spoken(lastEngineMove, currentSettings().notation)}")
+                tts.speak("last engine move: ${speakMoveText(lastEngineMove, currentSettings().notation)}")
             }
             tts.speak("your move")
         } catch (t: Throwable) {
@@ -209,6 +216,9 @@ class GameController(
             gameLock.withLock {
                 listenJob?.cancel()
                 listenJob = null
+                readJob?.cancel()
+                readJob = null
+                runCatching { tts.stop() }
                 // If we were mid-game (not already terminated), record as Abandoned.
                 val id = currentGameId
                 if (id != null && _state.value.status != Status.GameOver) {
@@ -234,6 +244,9 @@ class GameController(
             Log.d(TAG, "openListenWindow ignored in status=${_state.value.status}")
             return
         }
+        // Cancel any in-progress move-reading so its TTS queue stops.
+        readJob?.cancel()
+        readJob = null
         listenJob?.cancel()
         listenJob = scope.launch {
             // Silence any in-flight TTS (e.g. mid-describe-board) so the mic doesn't pick it up
@@ -271,10 +284,16 @@ class GameController(
         }
     }
 
-    /** Silently aborts an in-progress listen window. */
+    /** Silently aborts an in-progress listen window. Also cancels a move-read if one is
+     *  running, so PREVIOUS doubles as "stop reading". */
     fun cancelListenWindow() {
         listenJob?.cancel()
         listenJob = null
+        if (readJob != null) {
+            readJob?.cancel()
+            readJob = null
+            tts.stop()
+        }
     }
 
     /**
@@ -322,7 +341,7 @@ class GameController(
      */
     private fun announceEngineMove(move: String) {
         val s = currentSettings()
-        val moveText = MoveSpeech.spoken(move, s.notation)
+        val moveText = speakMoveText(move, s.notation)
         val full = if (s.verbose) {
             val mover = if (_state.value.whoseTurn == Color.White) "black" else "white"
             "$mover plays $moveText. your turn."
@@ -331,6 +350,21 @@ class GameController(
         }
         tts.speak(full)
     }
+
+    /**
+     * Routes a UCI move to the right spoken-text generator based on notation setting. For
+     * [SettingsRepository.Notation.Standard] we convert to SAN first (since SAN needs full
+     * game context — disambiguation, captures, check), then phonemize via [SanSpeech].
+     */
+    private fun speakMoveText(move: String, notation: SettingsRepository.Notation): String =
+        when (notation) {
+            SettingsRepository.Notation.LetterByLetter,
+            SettingsRepository.Notation.Nato -> MoveSpeech.spoken(move, notation)
+            SettingsRepository.Notation.Standard -> {
+                val san = SanConverter.toSan(_state.value.moves).lastOrNull() ?: move
+                SanSpeech.spoken(san)
+            }
+        }
 
     fun release() {
         runCatching { listenJob?.cancel() }
@@ -351,7 +385,7 @@ class GameController(
         when (command) {
             is VoiceCommand.Move -> handleMove(command.parsed, text)
             VoiceCommand.Repeat -> handleRepeat()
-            VoiceCommand.TakeBack -> handleTakeBack()
+            VoiceCommand.TakeBack -> takeBack()
             VoiceCommand.WhoseTurn -> handleWhoseTurn()
             VoiceCommand.HowManyMoves -> handleHowManyMoves()
             VoiceCommand.ListPieces -> handleListPieces()
@@ -359,6 +393,7 @@ class GameController(
             VoiceCommand.Resign -> handleResign()
             VoiceCommand.NewGame -> handleNewGame()
             is VoiceCommand.WhatsOn -> handleWhatsOn(command.square)
+            VoiceCommand.ReadMoves -> handleReadMoves()
         }
     }
 
@@ -380,7 +415,11 @@ class GameController(
         if (move == null) tts.speak("no engine move yet") else announceEngineMove(move)
     }
 
-    private suspend fun handleTakeBack() = gameLock.withLock {
+    /**
+     * Removes the last user+engine move pair. Public so non-voice paths (board view Undo
+     * button) can call directly. Same effect as the "take back" / "undo" voice command.
+     */
+    suspend fun takeBack() = gameLock.withLock {
         val moves = _state.value.moves
         if (moves.size < 2) {
             tts.speak("nothing to take back")
@@ -467,6 +506,49 @@ class GameController(
         } else {
             val color = if (piece.color == Color.White) "white" else "black"
             tts.speak("$color ${piece.type.spoken} on $spokenSquare")
+        }
+    }
+
+    /**
+     * Reads every move in chronological order via TTS with [READ_GAP_MS] between each.
+     * Spawns a separate [readJob] in [scope] so the surrounding listen window can close
+     * (status → WaitingForUser) and the user can interrupt with another tap. The job is
+     * cancelled by [openListenWindow], [cancelListenWindow], and [stopGame].
+     */
+    private fun handleReadMoves() {
+        val snapshot = _state.value.moves.toList()
+        if (snapshot.isEmpty()) {
+            tts.speak("no moves to read")
+            return
+        }
+        val notation = currentSettings().notation
+        readJob?.cancel()
+        readJob = scope.launch {
+            // Pre-compute SAN list once when in Standard mode — SanConverter rebuilds the
+            // whole list per call, O(n²) if we did it move-by-move.
+            val sanList: List<String>? = if (notation == SettingsRepository.Notation.Standard) {
+                SanConverter.toSan(snapshot)
+            } else {
+                null
+            }
+            tts.speakAndWait("reading move history")
+            delay(READ_INTRO_GAP_MS)
+            for ((idx, uci) in snapshot.withIndex()) {
+                val moveText = when (notation) {
+                    SettingsRepository.Notation.LetterByLetter,
+                    SettingsRepository.Notation.Nato ->
+                        MoveSpeech.spoken(uci, notation)
+                    SettingsRepository.Notation.Standard ->
+                        SanSpeech.spoken(sanList?.getOrNull(idx) ?: uci)
+                }
+                val moveNumber = idx / 2 + 1
+                val isWhite = idx % 2 == 0
+                val prefix = if (isWhite) "move $moveNumber. " else ""
+                tts.speakAndWait(prefix + moveText)
+                delay(READ_GAP_MS)
+            }
+            tts.speakAndWait("end of history")
+            readJob = null
         }
     }
 
@@ -580,5 +662,9 @@ class GameController(
     private companion object {
         const val TAG = "GameController"
         const val LISTEN_TIMEOUT_MS = 5_000L
+        /** Pause between successive moves during a "read moves" announcement. */
+        const val READ_GAP_MS = 2_000L
+        /** Slightly shorter pause after the "reading move history" intro. */
+        const val READ_INTRO_GAP_MS = 500L
     }
 }

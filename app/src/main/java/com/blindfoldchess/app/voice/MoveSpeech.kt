@@ -44,6 +44,10 @@ object MoveSpeech {
     ): String = when (notation) {
         SettingsRepository.Notation.LetterByLetter -> "$file $rank"
         SettingsRepository.Notation.Nato -> "${NATO_FILES[file] ?: file} ${RANK_WORDS[rank] ?: rank}"
+        // SAN mode is routed away from MoveSpeech at the GameController layer (it needs full
+        // game context to compute SAN). If a caller passes Standard here anyway, render in
+        // letter-by-letter style as a sensible fallback.
+        SettingsRepository.Notation.Standard -> "$file $rank"
     }
 
     private fun pieceName(c: Char): String = when (c.lowercaseChar()) {

@@ -73,6 +73,8 @@ object ChessGrammar {
         "describe the board",
         "resign",
         "new game",
+        "read moves",
+        "read the moves",
     )
 
     private fun phrasingsFor(uci: String): List<String> {

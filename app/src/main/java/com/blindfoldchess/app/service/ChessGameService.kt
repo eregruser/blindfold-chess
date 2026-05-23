@@ -139,6 +139,9 @@ class ChessGameService : Service() {
                     serviceScope.launch { gameController.submitTextMove(uci) }
                 }
             }
+            ACTION_TAKE_BACK -> {
+                serviceScope.launch { gameController.takeBack() }
+            }
             ACTION_ENABLE_TEST_MODE -> updateState { copy(testModeActive = true) }
             ACTION_DISABLE_TEST_MODE -> updateState { copy(testModeActive = false) }
             else -> Log.w(TAG, "Unknown start action: ${intent?.action}")
@@ -294,6 +297,7 @@ class ChessGameService : Service() {
         private const val ACTION_RESUME_GAME = "com.blindfoldchess.app.action.RESUME_GAME"
         private const val ACTION_STOP_GAME = "com.blindfoldchess.app.action.STOP_GAME"
         private const val ACTION_SUBMIT_MOVE = "com.blindfoldchess.app.action.SUBMIT_MOVE"
+        private const val ACTION_TAKE_BACK = "com.blindfoldchess.app.action.TAKE_BACK"
         private const val ACTION_ENABLE_TEST_MODE = "com.blindfoldchess.app.action.ENABLE_TEST_MODE"
         private const val ACTION_DISABLE_TEST_MODE = "com.blindfoldchess.app.action.DISABLE_TEST_MODE"
         private const val EXTRA_GAME_ID = "gameId"
@@ -324,6 +328,9 @@ class ChessGameService : Service() {
                 .putExtra(EXTRA_MOVE_UCI, uci)
             context.startForegroundService(intent)
         }
+
+        /** Drops the last user+engine move pair. Mirrors the "take back" voice command. */
+        fun takeBack(context: Context) = dispatch(context, ACTION_TAKE_BACK)
 
         private fun dispatch(context: Context, action: String) {
             val intent = Intent(context, ChessGameService::class.java).setAction(action)

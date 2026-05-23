@@ -22,7 +22,17 @@ import kotlinx.coroutines.flow.stateIn
  */
 class SettingsRepository(context: Context, scope: CoroutineScope) {
 
-    enum class Notation { LetterByLetter, Nato }
+    enum class Notation {
+        /** "e 2 e 4", "e 7 e 8 queen" — UCI characters spoken one at a time. */
+        LetterByLetter,
+
+        /** "echo two echo four", "echo seven echo eight queen" — NATO phonetic for files. */
+        Nato,
+
+        /** Standard algebraic notation spoken naturally: "e four", "knight f three",
+         *  "bishop takes e five, check", "castle kingside". Matches the on-screen move list. */
+        Standard,
+    }
 
     /**
      * Initial fog state when opening the Board view. After entry, the user toggles individual

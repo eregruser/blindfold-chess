@@ -3,10 +3,14 @@ package com.blindfoldchess.app.ui.board
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -23,12 +27,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blindfoldchess.app.BlindfoldChessApp
 import com.blindfoldchess.app.chess.Board
 import com.blindfoldchess.app.chess.Color
 import com.blindfoldchess.app.chess.Fen
+import com.blindfoldchess.app.chess.SanConverter
 import com.blindfoldchess.app.data.SettingsRepository
 import com.blindfoldchess.app.engine.GameController
 import com.blindfoldchess.app.service.ChessGameService
@@ -101,6 +107,12 @@ fun BoardScreen(onBack: () -> Unit) {
                     }
                 },
                 actions = {
+                    TextButton(
+                        onClick = { ChessGameService.takeBack(context) },
+                        enabled = serviceState.gameActive &&
+                            gameState.status == GameController.Status.WaitingForUser &&
+                            gameState.moves.size >= 2,
+                    ) { Text("Undo") }
                     TextButton(onClick = {
                         fogged = defaultFog(displayBoard, settings.fogMode, userColor)
                     }) { Text("Reset") }
@@ -138,29 +150,82 @@ fun BoardScreen(onBack: () -> Unit) {
                 },
             )
 
-            val instruction = when {
+            val statusMessage: String? = when {
                 !serviceState.gameActive ->
-                    "No game in progress. Start a game on the main screen to enable move input."
-                gameState.status == GameController.Status.WaitingForUser && selectedSquare == null ->
-                    "Tap to peek/fog. Long-press your piece to select it for a move."
-                gameState.status == GameController.Status.WaitingForUser ->
-                    "Long-press a green-dotted square to move, or long-press the selected square again to cancel."
+                    "No game in progress. Start one on the main screen to enable moves."
                 gameState.status == GameController.Status.Thinking ->
-                    "Engine is thinking — moves disabled until reply."
+                    "Engine is thinking…"
                 gameState.status == GameController.Status.Listening ->
-                    "Listening for voice input — moves disabled."
+                    "Listening for voice input…"
                 gameState.status == GameController.Status.GameOver ->
-                    "Game over. Moves disabled."
-                else -> when (settings.fogMode) {
-                    SettingsRepository.FogMode.FogAll ->
-                        "All squares fogged by default. Tap to peek; tap again to re-fog."
-                    SettingsRepository.FogMode.FogOpponent ->
-                        "Opponent's pieces hidden. Tap any square to toggle its fog."
-                    SettingsRepository.FogMode.RevealAll ->
-                        "Tap any square to fog it (e.g. to test your memory of one piece)."
-                }
+                    "Game over."
+                else -> null
             }
-            Text(instruction, style = MaterialTheme.typography.bodySmall)
+            if (statusMessage != null) {
+                Text(statusMessage, style = MaterialTheme.typography.bodySmall)
+            }
+
+            HorizontalDivider()
+
+            MovesPanel(
+                moves = gameState.moves,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            )
+        }
+    }
+}
+
+/**
+ * Move history below the board, most-recent pair at the top so the user doesn't have to
+ * scroll for the latest moves. Pairs are numbered with their original (chronological)
+ * move number — only the list order is reversed.
+ */
+@Composable
+private fun MovesPanel(
+    moves: List<String>,
+    modifier: Modifier = Modifier,
+) {
+    if (moves.isEmpty()) {
+        Text(
+            text = "No moves yet.",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = modifier,
+        )
+        return
+    }
+    val sanMoves = remember(moves) { SanConverter.toSan(moves) }
+    // Pair (white, black) then reverse so newest pair is at the top, but keep each pair's
+    // original move number for display.
+    val numberedPairsNewestFirst = sanMoves.chunked(2)
+        .mapIndexed { idx, pair -> idx + 1 to pair }
+        .asReversed()
+
+    Column(modifier = modifier) {
+        Text(
+            text = "Moves",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+        ) {
+            items(numberedPairsNewestFirst, key = { (n, _) -> n }) { (moveNumber, pair) ->
+                val white = pair[0]
+                val black = pair.getOrNull(1) ?: ""
+                Text(
+                    text = "%2d. %-6s   %s".format(moveNumber, white, black),
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = FontFamily.Monospace
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                )
+            }
         }
     }
 }

@@ -35,3 +35,9 @@ the engine release and inherit its GPLv3 license.
 
 Bundled as `app/src/main/assets/vosk-model-small-en-us-0.15/` (gitignored; fetched via
 `scripts/fetch_vosk.sh`). Distributed by Alpha Cephei under **Apache License 2.0**.
+
+## chesslib (UCI → SAN conversion)
+
+`com.github.bhlangonijr:chesslib:1.3.6` — used only for converting UCI move strings into
+Standard Algebraic Notation for display. Published via JitPack (no Maven Central artifact).
+**Apache License 2.0** (https://github.com/bhlangonijr/chesslib/blob/master/LICENSE).

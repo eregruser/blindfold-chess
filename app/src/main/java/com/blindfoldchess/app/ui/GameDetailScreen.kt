@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.blindfoldchess.app.BlindfoldChessApp
+import com.blindfoldchess.app.chess.SanConverter
 import com.blindfoldchess.app.data.GameEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -102,8 +103,9 @@ private fun DetailBody(game: GameEntity, padding: androidx.compose.foundation.la
         if (moves.isEmpty()) {
             Text("(no moves)", style = MaterialTheme.typography.bodyMedium)
         } else {
+            val sanMoves = remember(moves) { SanConverter.toSan(moves) }
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                itemsIndexed(moves.chunked(2)) { idx, pair ->
+                itemsIndexed(sanMoves.chunked(2)) { idx, pair ->
                     val n = idx + 1
                     val white = pair[0]
                     val black = pair.getOrNull(1) ?: ""
