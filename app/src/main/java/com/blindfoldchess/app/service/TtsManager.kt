@@ -49,6 +49,16 @@ class TtsManager(context: Context) : TextToSpeech.OnInitListener {
         }
     }
 
+    /** Cancels any in-flight utterance immediately. Used to interrupt long announcements
+     *  (e.g. describe-board) when the user opens a new listen window. */
+    fun stop() {
+        try {
+            tts.stop()
+        } catch (t: Throwable) {
+            Log.w(TAG, "TTS stop threw", t)
+        }
+    }
+
     fun shutdown() {
         try {
             tts.stop()

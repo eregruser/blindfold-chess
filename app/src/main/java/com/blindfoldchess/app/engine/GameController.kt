@@ -135,6 +135,9 @@ class GameController(
         }
         listenJob?.cancel()
         listenJob = scope.launch {
+            // Silence any in-flight TTS (e.g. mid-describe-board) so the mic doesn't pick it up
+            // and so the user gets immediate feedback that they're being heard.
+            tts.stop()
             _state.update { it.copy(status = Status.Listening, lastPartialText = "", lastFinalText = null) }
             earcons.listenStart()
             try {
@@ -176,6 +179,19 @@ class GameController(
     /** Re-speaks the last engine move. No-op if no engine move yet. */
     fun repeatLastEngineMove() {
         val move = _state.value.lastEngineMove ?: return
+        tts.speak(MoveSpeech.spoken(move))
+    }
+
+    /**
+     * Called after a transient audio-focus loss is recovered (e.g. phone call ended, alarm
+     * dismissed). Re-announces the engine's last move so the user knows where they were
+     * without having to remember through the interruption.
+     */
+    fun onFocusRegained() {
+        val st = _state.value
+        if (st.status != Status.WaitingForUser) return
+        val move = st.lastEngineMove ?: return
+        Log.i(TAG, "Focus regained mid-game; re-announcing engine move $move")
         tts.speak(MoveSpeech.spoken(move))
     }
 

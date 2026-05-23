@@ -58,12 +58,20 @@ class ChessGameService : Service() {
 
         tts = TtsManager(applicationContext)
         earcons = Earcons()
-        sessionAudio = SessionAudio(applicationContext) {
-            Log.w(TAG, "SessionAudio reported permanent focus loss; ending session")
-            gameController.stopGame()
-            updateState { State() }
-        }
+        // gameController must be initialized before sessionAudio's callbacks fire — both
+        // closures capture it as a lateinit reference and dispatch to it at runtime.
         gameController = GameController(applicationContext, tts, earcons)
+        sessionAudio = SessionAudio(
+            applicationContext,
+            onPermanentLoss = {
+                Log.w(TAG, "SessionAudio reported permanent focus loss; ending session")
+                gameController.stopGame()
+                updateState { State() }
+            },
+            onFocusRegained = {
+                gameController.onFocusRegained()
+            },
+        )
 
         serviceScope.launch {
             gameController.state.collect { _gameState.value = it }

@@ -206,15 +206,18 @@ Implemented:
 - NATO phonetic mode.
 - Illegal move handling, query commands (`what's on`, `list my pieces`, `repeat`, etc.).
 
-### Phase 5 — Audio focus lifecycle and interruptions
+### Phase 5 — Audio focus lifecycle and interruptions — DONE (basics)
 
-Phase 1 settled the steady-state audio model (full `AUDIOFOCUS_GAIN` + silent A2DP keepalive). This phase handles transitions:
+Phase 1.5 already covered the steady-state focus model (full `AUDIOFOCUS_GAIN` + silent A2DP keepalive, with `LOSS_TRANSIENT` pausing the keepalive and `LOSS` permanently ending the session). This phase finished the transitions:
 
-- Phone call mid-game: on `AUDIOFOCUS_LOSS_TRANSIENT`, stop the keepalive and pause TTS; on regain, resume keepalive and re-announce the engine's last move so the user has context after the interruption.
-- Alarm / Assistant briefly takes focus: same handling.
-- Permanent loss (`AUDIOFOCUS_LOSS`, e.g. user starts another media app deliberately): end the game cleanly and notify, rather than fighting another app for focus.
-- BT headset disconnect mid-game: keep the service alive, surface a state change in the UI, restart the keepalive on reconnect.
-- Verify resume-on-end behavior across Spotify, YouTube Music, YouTube, Pocket Casts, Apple Podcasts; ship a compatibility matrix in onboarding so users know whether their music will auto-resume.
+**Implemented:**
+- Phone call / alarm / Assistant brief takeover: `LOSS_TRANSIENT(_CAN_DUCK)` stops the keepalive; on `AUDIOFOCUS_GAIN`, the keepalive restarts and `GameController.onFocusRegained()` re-announces the engine's last move so the user has context after the interruption.
+- Permanent loss (`AUDIOFOCUS_LOSS`, e.g. user starts another media app deliberately): session ends cleanly via `onPermanentLoss` callback.
+- `TtsManager.stop()` called at the start of `openListenWindow` so the user can interrupt a long announcement (e.g. `"describe board"`) with a headset tap. Without this the mic would pick up the in-flight TTS.
+
+**Deferred to later (lower priority):**
+- BT headset disconnect / reconnect detection independent of focus events. The focus listener catches many of these for free (BT disconnect usually triggers focus loss), but a brief drop-and-reconnect without focus events isn't caught. Would need `ACTION_AUDIO_BECOMING_NOISY` + `BluetoothHeadset.STATE_AUDIO_DISCONNECTED` receivers.
+- Resume-on-end behavior matrix across Spotify / YouTube Music / YouTube / Pocket Casts / Apple Podcasts — needs hardware testing on each. Ship in onboarding.
 
 ### Phase 6 — Persistence
 - Room schema, auto-save per move, resume flow, history list, PGN export.

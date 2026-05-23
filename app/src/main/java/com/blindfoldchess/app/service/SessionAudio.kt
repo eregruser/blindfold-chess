@@ -26,6 +26,7 @@ import android.util.Log
 class SessionAudio(
     context: Context,
     private val onPermanentLoss: () -> Unit = {},
+    private val onFocusRegained: () -> Unit = {},
 ) {
 
     private val audioManager: AudioManager =
@@ -82,6 +83,7 @@ class SessionAudio(
             AudioManager.AUDIOFOCUS_GAIN -> {
                 Log.d(TAG, "Focus regained; resuming keepalive")
                 startSilentStream()
+                onFocusRegained()
             }
             AudioManager.AUDIOFOCUS_LOSS -> {
                 Log.w(TAG, "Permanent focus loss; signalling session end")
