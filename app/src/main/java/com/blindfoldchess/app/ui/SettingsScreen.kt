@@ -23,6 +23,7 @@ fun SettingsScreen(
     onOpenHeadphoneTest: () -> Unit,
     onOpenEngineSelfTest: () -> Unit,
     onOpenVoiceTest: () -> Unit,
+    onOpenGameHistory: () -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -58,6 +59,12 @@ fun SettingsScreen(
                 headlineContent = { Text("Voice test") },
                 supportingContent = { Text("Bare Vosk ASR — see what the recognizer hears") },
                 modifier = Modifier.clickable(onClick = onOpenVoiceTest),
+            )
+            HorizontalDivider()
+            ListItem(
+                headlineContent = { Text("Game history") },
+                supportingContent = { Text("Completed games — result, date, move list") },
+                modifier = Modifier.clickable(onClick = onOpenGameHistory),
             )
             HorizontalDivider()
         }
