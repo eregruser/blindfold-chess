@@ -7,6 +7,7 @@ import com.blindfoldchess.app.chess.Color
 import com.blindfoldchess.app.chess.PieceType
 import com.blindfoldchess.app.data.GameRepository
 import com.blindfoldchess.app.data.GameResult
+import com.blindfoldchess.app.data.SettingsRepository
 import com.blindfoldchess.app.service.Earcons
 import com.blindfoldchess.app.service.TtsManager
 import com.blindfoldchess.app.voice.ChessGrammar
@@ -51,7 +52,10 @@ class GameController(
     private val tts: TtsManager,
     private val earcons: Earcons,
     private val repo: GameRepository,
+    private val settings: SettingsRepository,
 ) {
+
+    private fun currentSettings(): SettingsRepository.Settings = settings.settings.value
 
     enum class Status { Idle, Loading, WaitingForUser, Listening, Thinking, GameOver, Error }
 
@@ -100,7 +104,8 @@ class GameController(
             } else {
                 Log.w(TAG, "NNUE not bundled — engine will use degraded eval")
             }
-            engine.setOption("Skill Level", DEFAULT_SKILL.toString())
+            val s = currentSettings()
+            engine.setOption("Skill Level", s.skillLevel.toString())
             engine.newGame()
             recognizer.ensureModel()
             engine.setPosition(startFen = null, moves = emptyList())
@@ -108,7 +113,7 @@ class GameController(
 
             // Abandon any previously-active game and create a fresh row for this session.
             abandonAnyActiveGame()
-            currentGameId = repo.startNewGame(skillLevel = DEFAULT_SKILL)
+            currentGameId = repo.startNewGame(skillLevel = s.skillLevel)
 
             _state.update {
                 State(status = Status.WaitingForUser, legalMoves = initialLegal)
@@ -179,7 +184,7 @@ class GameController(
             }
             tts.speak("game resumed")
             if (lastEngineMove != null) {
-                tts.speak("last engine move: ${MoveSpeech.spoken(lastEngineMove)}")
+                tts.speak("last engine move: ${MoveSpeech.spoken(lastEngineMove, currentSettings().notation)}")
             }
             tts.speak("your move")
         } catch (t: Throwable) {
@@ -265,7 +270,7 @@ class GameController(
     /** Re-speaks the last engine move. No-op if no engine move yet. */
     fun repeatLastEngineMove() {
         val move = _state.value.lastEngineMove ?: return
-        tts.speak(MoveSpeech.spoken(move))
+        announceEngineMove(move)
     }
 
     /**
@@ -278,7 +283,25 @@ class GameController(
         if (st.status != Status.WaitingForUser) return
         val move = st.lastEngineMove ?: return
         Log.i(TAG, "Focus regained mid-game; re-announcing engine move $move")
-        tts.speak(MoveSpeech.spoken(move))
+        announceEngineMove(move)
+    }
+
+    /**
+     * TTS an engine move respecting the user's notation + verbosity settings. In verbose mode
+     * prepends the moving side and appends "your turn." so the user can follow along after
+     * an interruption / repeat. Caller is responsible for game-state being post-engine-reply
+     * (i.e. status WaitingForUser, [_state] whoseTurn = user's color).
+     */
+    private fun announceEngineMove(move: String) {
+        val s = currentSettings()
+        val moveText = MoveSpeech.spoken(move, s.notation)
+        val full = if (s.verbose) {
+            val mover = if (_state.value.whoseTurn == Color.White) "black" else "white"
+            "$mover plays $moveText. your turn."
+        } else {
+            moveText
+        }
+        tts.speak(full)
     }
 
     fun release() {
@@ -326,7 +349,7 @@ class GameController(
 
     private fun handleRepeat() {
         val move = _state.value.lastEngineMove
-        if (move == null) tts.speak("no engine move yet") else tts.speak(MoveSpeech.spoken(move))
+        if (move == null) tts.speak("no engine move yet") else announceEngineMove(move)
     }
 
     private suspend fun handleTakeBack() = gameLock.withLock {
@@ -395,11 +418,12 @@ class GameController(
         }
         currentGameId = null
 
-        engine.setOption("Skill Level", DEFAULT_SKILL.toString())
+        val s = currentSettings()
+        engine.setOption("Skill Level", s.skillLevel.toString())
         engine.newGame()
         engine.setPosition(startFen = null, moves = emptyList())
         val initialLegal = engine.perft(1)
-        currentGameId = repo.startNewGame(skillLevel = DEFAULT_SKILL)
+        currentGameId = repo.startNewGame(skillLevel = s.skillLevel)
         _state.value = State(status = Status.WaitingForUser, legalMoves = initialLegal)
         tts.speak("new game. your move.")
     }
@@ -464,7 +488,7 @@ class GameController(
             _state.update { it.copy(status = Status.Thinking, moves = it.moves + uci) }
             try {
                 engine.setPosition(startFen = null, moves = _state.value.moves)
-                val reply = engine.goMoveTime(ENGINE_MOVE_TIME_MS)
+                val reply = engine.goMoveTime(currentSettings().moveTimeMs)
                 val userMatedEngine = reply == "(none)" || reply == "0000" || reply.isBlank()
                 if (userMatedEngine) {
                     _state.update {
@@ -498,7 +522,7 @@ class GameController(
                         // Could be mate or stalemate — we don't distinguish for now (Phase 6+).
                         finalizeGame(GameResult.UserLoss)
                     }
-                    tts.speak(MoveSpeech.spoken(reply))
+                    announceEngineMove(reply)
                     if (userHasNoMoves) tts.speak("game over")
                 }
             } catch (t: Throwable) {
@@ -524,8 +548,5 @@ class GameController(
     private companion object {
         const val TAG = "GameController"
         const val LISTEN_TIMEOUT_MS = 5_000L
-        const val ENGINE_MOVE_TIME_MS = 500L
-        /** Default Stockfish "Skill Level" UCI option. Settings UI in Phase 7 will expose. */
-        const val DEFAULT_SKILL = 5
     }
 }

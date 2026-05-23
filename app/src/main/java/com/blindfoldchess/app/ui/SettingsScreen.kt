@@ -24,6 +24,7 @@ fun SettingsScreen(
     onOpenEngineSelfTest: () -> Unit,
     onOpenVoiceTest: () -> Unit,
     onOpenGameHistory: () -> Unit,
+    onOpenPreferences: () -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -43,6 +44,12 @@ fun SettingsScreen(
                 .padding(padding)
                 .fillMaxSize(),
         ) {
+            ListItem(
+                headlineContent = { Text("Game preferences") },
+                supportingContent = { Text("Engine strength, think time, spoken notation, verbosity") },
+                modifier = Modifier.clickable(onClick = onOpenPreferences),
+            )
+            HorizontalDivider()
             ListItem(
                 headlineContent = { Text("Headphone button test") },
                 supportingContent = { Text("Log every media key event received from a connected headset") },

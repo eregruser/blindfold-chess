@@ -15,6 +15,7 @@ object Routes {
     const val VoiceTest = "settings/voice_test"
     const val GameHistory = "settings/game_history"
     const val GameDetail = "settings/game_history/{gameId}"
+    const val Preferences = "settings/preferences"
 
     fun gameDetail(gameId: Long) = "settings/game_history/$gameId"
 }
@@ -32,8 +33,12 @@ fun AppNavHost() {
                 onOpenEngineSelfTest = { nav.navigate(Routes.EngineSelfTest) },
                 onOpenVoiceTest = { nav.navigate(Routes.VoiceTest) },
                 onOpenGameHistory = { nav.navigate(Routes.GameHistory) },
+                onOpenPreferences = { nav.navigate(Routes.Preferences) },
                 onBack = { nav.popBackStack() },
             )
+        }
+        composable(Routes.Preferences) {
+            PreferencesScreen(onBack = { nav.popBackStack() })
         }
         composable(Routes.HeadphoneTest) {
             HeadphoneTestScreen(onBack = { nav.popBackStack() })

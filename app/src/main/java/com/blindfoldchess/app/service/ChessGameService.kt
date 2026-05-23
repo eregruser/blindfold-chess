@@ -62,7 +62,13 @@ class ChessGameService : Service() {
         // gameController must be initialized before sessionAudio's callbacks fire — both
         // closures capture it as a lateinit reference and dispatch to it at runtime.
         val app = applicationContext as BlindfoldChessApp
-        gameController = GameController(applicationContext, tts, earcons, app.gameRepository)
+        gameController = GameController(
+            applicationContext,
+            tts,
+            earcons,
+            app.gameRepository,
+            app.settingsRepository,
+        )
         sessionAudio = SessionAudio(
             applicationContext,
             onPermanentLoss = {
