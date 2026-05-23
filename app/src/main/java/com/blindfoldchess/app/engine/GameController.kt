@@ -2,11 +2,16 @@ package com.blindfoldchess.app.engine
 
 import android.content.Context
 import android.util.Log
+import com.blindfoldchess.app.chess.Board
+import com.blindfoldchess.app.chess.Color
+import com.blindfoldchess.app.chess.PieceType
 import com.blindfoldchess.app.service.Earcons
 import com.blindfoldchess.app.service.TtsManager
 import com.blindfoldchess.app.voice.ChessGrammar
 import com.blindfoldchess.app.voice.MoveParser
 import com.blindfoldchess.app.voice.MoveSpeech
+import com.blindfoldchess.app.voice.VoiceCommand
+import com.blindfoldchess.app.voice.VoiceCommandParser
 import com.blindfoldchess.app.voice.VoskRecognizer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,7 +51,6 @@ class GameController(
 ) {
 
     enum class Status { Idle, Loading, WaitingForUser, Listening, Thinking, GameOver, Error }
-    enum class Color { White, Black }
 
     data class State(
         val status: Status = Status.Idle,
@@ -64,7 +68,10 @@ class GameController(
     private val engine = StockfishEngine(jni)
     private val recognizer = VoskRecognizer(context)
     private val assets = EngineAssets(context)
-    private val parser = MoveParser()
+    private val commandParser = VoiceCommandParser(MoveParser())
+
+    /** The human side. v1 hard-codes white; settings toggle will arrive later. */
+    private val userColor: Color = Color.White
 
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
@@ -182,15 +189,32 @@ class GameController(
     // -------------------------------------------------------------------------
 
     private suspend fun processSpoken(text: String) {
-        val parsed = parser.parse(text)
-        if (parsed == null) {
+        val command = commandParser.parse(text)
+        if (command == null) {
             tts.speak("didn't catch that")
             _state.update { it.copy(status = Status.WaitingForUser) }
             return
         }
+        when (command) {
+            is VoiceCommand.Move -> handleMove(command.parsed, text)
+            VoiceCommand.Repeat -> handleRepeat()
+            VoiceCommand.TakeBack -> handleTakeBack()
+            VoiceCommand.WhoseTurn -> handleWhoseTurn()
+            VoiceCommand.HowManyMoves -> handleHowManyMoves()
+            VoiceCommand.ListPieces -> handleListPieces()
+            VoiceCommand.DescribeBoard -> handleDescribeBoard()
+            VoiceCommand.Resign -> handleResign()
+            VoiceCommand.NewGame -> handleNewGame()
+            is VoiceCommand.WhatsOn -> handleWhatsOn(command.square)
+        }
+    }
+
+    // ---------- handlers ----------
+
+    private suspend fun handleMove(parsed: MoveParser.Parsed, originalText: String) {
         val uci = resolveToUci(parsed)
         if (uci !in _state.value.legalMoves) {
-            Log.i(TAG, "Rejecting illegal move \"$uci\" (parsed from \"$text\")")
+            Log.i(TAG, "Rejecting illegal move \"$uci\" (parsed from \"$originalText\")")
             tts.speak("illegal")
             _state.update { it.copy(status = Status.WaitingForUser) }
             return
@@ -198,12 +222,128 @@ class GameController(
         playUserMove(uci)
     }
 
+    private fun handleRepeat() {
+        val move = _state.value.lastEngineMove
+        if (move == null) tts.speak("no engine move yet") else tts.speak(MoveSpeech.spoken(move))
+    }
+
+    private suspend fun handleTakeBack() = gameLock.withLock {
+        val moves = _state.value.moves
+        if (moves.size < 2) {
+            tts.speak("nothing to take back")
+            return@withLock
+        }
+        val newMoves = moves.dropLast(2)
+        engine.setPosition(startFen = null, moves = newMoves)
+        val nextLegal = engine.perft(1)
+        _state.update {
+            it.copy(
+                status = Status.WaitingForUser,
+                moves = newMoves,
+                lastEngineMove = newMoves.lastOrNull(),
+                legalMoves = nextLegal,
+                message = null,
+            )
+        }
+        tts.speak("taken back")
+    }
+
+    private fun handleWhoseTurn() {
+        val side = if (_state.value.whoseTurn == Color.White) "white" else "black"
+        tts.speak("$side to move")
+    }
+
+    private fun handleHowManyMoves() {
+        val full = (_state.value.moves.size + 1) / 2
+        tts.speak("$full full moves played")
+    }
+
+    private suspend fun handleListPieces() = gameLock.withLock {
+        val board = engine.currentBoard()
+        val phrase = describePieces(board, userColor)
+        tts.speak("your pieces: $phrase")
+    }
+
+    private suspend fun handleDescribeBoard() = gameLock.withLock {
+        val board = engine.currentBoard()
+        val white = describePieces(board, Color.White)
+        val black = describePieces(board, Color.Black)
+        // Single TTS call — multiple calls would self-cancel via QUEUE_FLUSH.
+        tts.speak("white: $white. black: $black.")
+    }
+
+    private fun handleResign() {
+        _state.update {
+            it.copy(
+                status = Status.GameOver,
+                legalMoves = emptyList(),
+                message = "Resigned",
+            )
+        }
+        tts.speak("game over, you resigned")
+    }
+
+    private suspend fun handleNewGame() = gameLock.withLock {
+        engine.newGame()
+        engine.setPosition(startFen = null, moves = emptyList())
+        val initialLegal = engine.perft(1)
+        _state.value = State(status = Status.WaitingForUser, legalMoves = initialLegal)
+        tts.speak("new game. your move.")
+    }
+
+    private suspend fun handleWhatsOn(square: String) = gameLock.withLock {
+        val board = engine.currentBoard()
+        val piece = board.pieceAt(square)
+        val spokenSquare = squareToSpoken(square)
+        if (piece == null) {
+            tts.speak("$spokenSquare is empty")
+        } else {
+            val color = if (piece.color == Color.White) "white" else "black"
+            tts.speak("$color ${piece.type.spoken} on $spokenSquare")
+        }
+    }
+
+    // ---------- helpers ----------
+
     private fun resolveToUci(parsed: MoveParser.Parsed): String = when (parsed) {
         is MoveParser.Parsed.Normal -> parsed.toUci()
         MoveParser.Parsed.CastleKingside ->
             if (_state.value.whoseTurn == Color.White) "e1g1" else "e8g8"
         MoveParser.Parsed.CastleQueenside ->
             if (_state.value.whoseTurn == Color.White) "e1c1" else "e8c8"
+    }
+
+    private fun describePieces(board: Board, color: Color): String {
+        val pieces = board.piecesOf(color)
+        if (pieces.isEmpty()) return "none"
+        // Group by piece type for a shorter announcement.
+        val byType = pieces.groupBy { it.second.type }
+        val ordered = listOf(
+            PieceType.King, PieceType.Queen, PieceType.Rook,
+            PieceType.Bishop, PieceType.Knight, PieceType.Pawn,
+        )
+        return ordered.mapNotNull { type ->
+            val squares = byType[type] ?: return@mapNotNull null
+            val placed = squares.joinToString(" and ") { squareToSpoken(it.first) }
+            val noun = if (squares.size == 1) type.spoken else "${type.spoken}s"
+            "$noun on $placed"
+        }.joinToString(", ")
+    }
+
+    private fun squareToSpoken(square: String): String {
+        val file = square[0]
+        val rank = square[1]
+        val fileWord = when (file) {
+            'a' -> "alpha"; 'b' -> "bravo"; 'c' -> "charlie"; 'd' -> "delta"
+            'e' -> "echo"; 'f' -> "foxtrot"; 'g' -> "golf"; 'h' -> "hotel"
+            else -> file.toString()
+        }
+        val rankWord = when (rank) {
+            '1' -> "one"; '2' -> "two"; '3' -> "three"; '4' -> "four"
+            '5' -> "five"; '6' -> "six"; '7' -> "seven"; '8' -> "eight"
+            else -> rank.toString()
+        }
+        return "$fileWord $rankWord"
     }
 
     private suspend fun playUserMove(uci: String) {

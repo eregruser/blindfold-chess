@@ -10,6 +10,7 @@
 local.properties
 /app/build
 /app/release
+.kotlin/
 
 # Claude Code metadata — uncomment to share agent/skill config across machines
 .claude/

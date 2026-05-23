@@ -41,11 +41,39 @@ object ChessGrammar {
      * rather than being force-matched to a legal move.
      */
     fun legal(legalMoves: List<String>): String {
-        val phrases = LinkedHashSet<String>(legalMoves.size * 2)
+        val phrases = LinkedHashSet<String>()
+        // Legal moves first
         for (uci in legalMoves) phrases.addAll(phrasingsFor(uci))
+        // Always-available commands
+        phrases.addAll(COMMAND_PHRASES)
+        // "what is on <file> <rank>" / "whats on <file> <rank>" for every square
+        for (fileWord in NATO_FILES.values) {
+            for (rankWord in RANK_WORDS.values) {
+                phrases.add("whats on $fileWord $rankWord")
+                phrases.add("what is on $fileWord $rankWord")
+            }
+        }
         phrases.add("[unk]")
         return phrases.joinToString(prefix = "[\"", separator = "\", \"", postfix = "\"]")
     }
+
+    private val COMMAND_PHRASES = listOf(
+        "repeat",
+        "repeat that",
+        "repeat the move",
+        "take back",
+        "undo",
+        "undo that",
+        "whose turn",
+        "whose turn is it",
+        "how many moves",
+        "list my pieces",
+        "list pieces",
+        "describe board",
+        "describe the board",
+        "resign",
+        "new game",
+    )
 
     private fun phrasingsFor(uci: String): List<String> {
         // Castling — UCI king-from/king-to encoding (standard, not Chess960).
