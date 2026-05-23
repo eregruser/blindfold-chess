@@ -23,6 +23,7 @@ fun SettingsScreen(
     onOpenHeadphoneTest: () -> Unit,
     onOpenEngineSelfTest: () -> Unit,
     onOpenPlayVsEngine: () -> Unit,
+    onOpenVoiceTest: () -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -58,6 +59,12 @@ fun SettingsScreen(
                 headlineContent = { Text("Play vs engine (text)") },
                 supportingContent = { Text("Type UCI moves; engine replies with adjustable Skill Level") },
                 modifier = Modifier.clickable(onClick = onOpenPlayVsEngine),
+            )
+            HorizontalDivider()
+            ListItem(
+                headlineContent = { Text("Voice test") },
+                supportingContent = { Text("Bare Vosk ASR — see what the recognizer hears") },
+                modifier = Modifier.clickable(onClick = onOpenVoiceTest),
             )
             HorizontalDivider()
         }

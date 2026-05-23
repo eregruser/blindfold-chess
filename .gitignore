@@ -17,3 +17,7 @@ local.properties
 # Stockfish NNUE network files. Large (~108MB combined); fetched separately
 # via scripts/fetch_nnue.sh after clone so they don't bloat git history.
 app/src/main/assets/*.nnue
+
+# Vosk speech-recognition model. ~68MB extracted; fetched separately by
+# scripts/fetch_vosk.sh after clone.
+app/src/main/assets/vosk-model-*/

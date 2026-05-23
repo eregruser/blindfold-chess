@@ -3,7 +3,13 @@
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- FOREGROUND_SERVICE_MICROPHONE and the matching foregroundServiceType
+         "microphone" are added in Phase 3c when ASR moves into the service.
+         For Phase 3a the mic is captured by the voice-test Activity, which
+         only needs RECORD_AUDIO. -->
 
     <application
         android:allowBackup="true"

@@ -83,6 +83,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
 
     implementation(libs.androidx.media)
+    implementation(libs.vosk.android)
 
     debugImplementation(libs.androidx.ui.tooling)
 }

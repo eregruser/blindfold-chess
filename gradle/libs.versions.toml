@@ -7,6 +7,7 @@ activity = "1.9.3"
 composeBom = "2024.10.01"
 navigation = "2.8.3"
 media = "1.7.0"
+vosk = "0.3.75"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -23,6 +24,7 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 androidx-material-icons-core = { group = "androidx.compose.material", name = "material-icons-core" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
 androidx-media = { group = "androidx.media", name = "media", version.ref = "media" }
+vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
