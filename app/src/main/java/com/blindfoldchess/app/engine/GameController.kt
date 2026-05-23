@@ -126,6 +126,68 @@ class GameController(
         repo.markComplete(active.id, GameResult.Abandoned)
     }
 
+    /**
+     * Boots engine + recognizer, restores a saved unfinished game's position, sets state
+     * to WaitingForUser. Assumes the saved move list is at the user's turn (always true
+     * given when persistMoves runs — after each engine reply).
+     */
+    suspend fun resumeGame(gameId: Long) = gameLock.withLock {
+        val cur = _state.value.status
+        if (cur != Status.Idle && cur != Status.GameOver && cur != Status.Error) {
+            Log.w(TAG, "resumeGame ignored in status=$cur")
+            return@withLock
+        }
+        val game = repo.findById(gameId)
+        if (game == null) {
+            Log.w(TAG, "resumeGame: no game with id $gameId")
+            _state.update { it.copy(status = Status.Error, message = "Game $gameId not found") }
+            return@withLock
+        }
+        if (game.completedAt != null) {
+            Log.w(TAG, "resumeGame: game $gameId is already completed")
+            _state.update { it.copy(status = Status.Error, message = "Game already finished") }
+            return@withLock
+        }
+
+        _state.update { State(status = Status.Loading, message = "Resuming game...") }
+        try {
+            val nnue = withContext(Dispatchers.IO) { assets.ensureExtracted() }
+            engine.start()
+            if (nnue != null) {
+                engine.setOption("EvalFile", nnue.big.absolutePath)
+                engine.setOption("EvalFileSmall", nnue.small.absolutePath)
+            }
+            engine.setOption("Skill Level", game.skillLevel.toString())
+            engine.newGame()
+            recognizer.ensureModel()
+
+            val moves = game.movesUci.split(" ").filter { it.isNotBlank() }
+            engine.setPosition(startFen = null, moves = moves)
+            val legal = engine.perft(1)
+            currentGameId = game.id
+
+            // lastEngineMove is the latest move IF the move count is even (which it should be,
+            // since persistMoves only runs after engine replies).
+            val lastEngineMove = if (moves.isNotEmpty() && moves.size % 2 == 0) moves.last() else null
+            _state.update {
+                State(
+                    status = Status.WaitingForUser,
+                    moves = moves,
+                    lastEngineMove = lastEngineMove,
+                    legalMoves = legal,
+                )
+            }
+            tts.speak("game resumed")
+            if (lastEngineMove != null) {
+                tts.speak("last engine move: ${MoveSpeech.spoken(lastEngineMove)}")
+            }
+            tts.speak("your move")
+        } catch (t: Throwable) {
+            Log.w(TAG, "resumeGame failed", t)
+            _state.update { it.copy(status = Status.Error, message = t.message ?: "resume failed") }
+        }
+    }
+
     /** Stops engine/recognizer and resets to Idle. Safe to call from any state. */
     fun stopGame() {
         scope.launch {

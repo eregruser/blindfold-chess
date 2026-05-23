@@ -18,10 +18,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,15 +42,25 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.blindfoldchess.app.BlindfoldChessApp
+import com.blindfoldchess.app.data.GameEntity
+import com.blindfoldchess.app.data.GameResult
 import com.blindfoldchess.app.engine.GameController
 import com.blindfoldchess.app.service.ChessGameService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.text.DateFormat
+import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(onOpenSettings: () -> Unit) {
     val context = LocalContext.current
+    val app = context.applicationContext as BlindfoldChessApp
     val serviceState by ChessGameService.state.collectAsStateWithLifecycle()
     val gameState by ChessGameService.gameState.collectAsStateWithLifecycle()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     var micGranted by remember {
         mutableStateOf(
@@ -59,6 +72,18 @@ fun MainScreen(onOpenSettings: () -> Unit) {
     val micPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted -> micGranted = granted }
+
+    // Active unfinished game from a previous session (if any). Re-checked whenever the
+    // service's gameActive transitions, so after a Stop/end-of-game the card reappears
+    // for the now-completed (or for the abandoned predecessor) row.
+    var resumeCandidate by remember { mutableStateOf<GameEntity?>(null) }
+    LaunchedEffect(serviceState.gameActive) {
+        resumeCandidate = if (!serviceState.gameActive) {
+            withContext(Dispatchers.IO) { app.gameRepository.findActive() }
+        } else {
+            null
+        }
+    }
 
     val listState = rememberLazyListState()
     LaunchedEffect(gameState.moves.size) {
@@ -84,6 +109,25 @@ fun MainScreen(onOpenSettings: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             StatusRow(gameState, serviceState.gameActive)
+
+            resumeCandidate?.let { candidate ->
+                ResumeCard(
+                    game = candidate,
+                    onResume = {
+                        ChessGameService.resumeGame(context, candidate.id)
+                        resumeCandidate = null
+                    },
+                    onDiscard = {
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                app.gameRepository.markComplete(candidate.id, GameResult.Abandoned)
+                            }
+                            resumeCandidate = null
+                        }
+                    },
+                )
+            }
+
             HelpText()
 
             HorizontalDivider()
@@ -173,6 +217,41 @@ private fun StatusRow(gameState: GameController.State, gameActive: Boolean) {
             text = "hearing: \"${gameState.lastPartialText}\"",
             style = MaterialTheme.typography.bodySmall,
         )
+    }
+}
+
+@Composable
+private fun ResumeCard(
+    game: GameEntity,
+    onResume: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    val moveCount = game.movesUci.split(' ').count { it.isNotBlank() }
+    val fullMoves = (moveCount + 1) / 2
+    val whoseTurn = if (moveCount % 2 == 0) "your turn" else "engine's turn"
+    val createdLabel = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+        .format(Date(game.createdAt))
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text("Unfinished game", style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = "Started $createdLabel · $fullMoves full moves · $whoseTurn",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onResume) { Text("Resume") }
+                OutlinedButton(onClick = onDiscard) { Text("Discard") }
+            }
+        }
     }
 }
 

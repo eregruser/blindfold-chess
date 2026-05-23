@@ -101,7 +101,7 @@ class ChessGameService : Service() {
         // Decide foreground type up-front; the type-with-microphone path needs RECORD_AUDIO
         // granted at startForeground time on Android 14+.
         val willHaveGame = when (intent?.action) {
-            ACTION_START_GAME -> true
+            ACTION_START_GAME, ACTION_RESUME_GAME -> true
             ACTION_STOP_GAME -> false
             else -> _state.value.gameActive
         }
@@ -111,6 +111,15 @@ class ChessGameService : Service() {
             ACTION_START_GAME -> {
                 updateState { copy(gameActive = true) }
                 serviceScope.launch { gameController.startGame() }
+            }
+            ACTION_RESUME_GAME -> {
+                val gameId = intent.getLongExtra(EXTRA_GAME_ID, -1L)
+                if (gameId < 0) {
+                    Log.w(TAG, "ACTION_RESUME_GAME missing $EXTRA_GAME_ID extra")
+                } else {
+                    updateState { copy(gameActive = true) }
+                    serviceScope.launch { gameController.resumeGame(gameId) }
+                }
             }
             ACTION_STOP_GAME -> {
                 gameController.stopGame()
@@ -268,9 +277,11 @@ class ChessGameService : Service() {
         private const val NOTIFICATION_ID = 1
 
         private const val ACTION_START_GAME = "com.blindfoldchess.app.action.START_GAME"
+        private const val ACTION_RESUME_GAME = "com.blindfoldchess.app.action.RESUME_GAME"
         private const val ACTION_STOP_GAME = "com.blindfoldchess.app.action.STOP_GAME"
         private const val ACTION_ENABLE_TEST_MODE = "com.blindfoldchess.app.action.ENABLE_TEST_MODE"
         private const val ACTION_DISABLE_TEST_MODE = "com.blindfoldchess.app.action.DISABLE_TEST_MODE"
+        private const val EXTRA_GAME_ID = "gameId"
 
         private val _state = MutableStateFlow(State())
         val state: StateFlow<State> = _state.asStateFlow()
@@ -282,6 +293,13 @@ class ChessGameService : Service() {
         fun stopGame(context: Context) = dispatch(context, ACTION_STOP_GAME)
         fun enableTestMode(context: Context) = dispatch(context, ACTION_ENABLE_TEST_MODE)
         fun disableTestMode(context: Context) = dispatch(context, ACTION_DISABLE_TEST_MODE)
+
+        fun resumeGame(context: Context, gameId: Long) {
+            val intent = Intent(context, ChessGameService::class.java)
+                .setAction(ACTION_RESUME_GAME)
+                .putExtra(EXTRA_GAME_ID, gameId)
+            context.startForegroundService(intent)
+        }
 
         private fun dispatch(context: Context, action: String) {
             val intent = Intent(context, ChessGameService::class.java).setAction(action)
