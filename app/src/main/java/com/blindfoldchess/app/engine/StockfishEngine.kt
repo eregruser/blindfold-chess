@@ -1,9 +1,13 @@
 package com.blindfoldchess.app.engine
 
 import android.util.Log
+import com.blindfoldchess.app.chess.Board
+import com.blindfoldchess.app.chess.Fen
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onSubscription
+import kotlinx.coroutines.flow.takeWhile
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -83,9 +87,49 @@ class StockfishEngine(private val jni: StockfishJni = StockfishJni()) {
         return line.removePrefix("bestmove ").trim().substringBefore(' ')
     }
 
+    /**
+     * Sends `go perft <depth>` and returns the list of legal moves (or perft subtree counts'
+     * source moves) parsed from the engine's response. At depth = 1 this is exactly the set
+     * of legal moves from the current position.
+     *
+     * Engine must be idle (no active search). Caller is responsible for serializing.
+     */
+    suspend fun perft(depth: Int = 1, timeout: Duration = 5.seconds): List<String> {
+        val moves = mutableListOf<String>()
+        withTimeout(timeout) {
+            jni.output
+                .onSubscription { jni.send("go perft $depth") }
+                .takeWhile { !it.startsWith("Nodes searched:") }
+                .toList()
+                .forEach { line ->
+                    val colon = line.indexOf(':')
+                    if (colon in 4..5) {
+                        val token = line.substring(0, colon).trim()
+                        if (UCI_MOVE.matches(token)) moves.add(token)
+                    }
+                }
+        }
+        return moves
+    }
+
+    /**
+     * Sends `d` (display) and parses the resulting `Fen: ...` line into a [Board]. Engine must
+     * be idle.
+     */
+    suspend fun currentBoard(timeout: Duration = 5.seconds): Board {
+        val fenLine = withTimeout(timeout) {
+            jni.output
+                .onSubscription { jni.send("d") }
+                .first { it.startsWith("Fen:") }
+        }
+        val fen = fenLine.removePrefix("Fen:").trim()
+        return Fen.parse(fen)
+    }
+
     fun stop() = jni.stop()
 
     private companion object {
         const val TAG = "StockfishEngine"
+        val UCI_MOVE = Regex("^[a-h][1-8][a-h][1-8][qrbn]?$")
     }
 }
