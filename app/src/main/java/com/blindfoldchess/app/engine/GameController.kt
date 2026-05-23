@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.blindfoldchess.app.service.Earcons
 import com.blindfoldchess.app.service.TtsManager
+import com.blindfoldchess.app.voice.ChessGrammar
 import com.blindfoldchess.app.voice.MoveParser
 import com.blindfoldchess.app.voice.MoveSpeech
 import com.blindfoldchess.app.voice.VoskRecognizer
@@ -125,7 +126,7 @@ class GameController(
             _state.update { it.copy(status = Status.Listening, lastPartialText = "", lastFinalText = null) }
             earcons.listenStart()
             try {
-                recognizer.startListening()
+                recognizer.startListening(grammar = ChessGrammar.fullBoard)
                 val partialCollector = launch {
                     recognizer.events.filter { !it.isFinal }.collect { event ->
                         _state.update { it.copy(lastPartialText = event.text) }

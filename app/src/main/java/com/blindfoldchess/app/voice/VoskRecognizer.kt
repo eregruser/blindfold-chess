@@ -136,11 +136,13 @@ class VoskRecognizer(private val context: Context) {
 
         override fun onResult(hypothesis: String) {
             val text = parseField(hypothesis, "text")
+            Log.d(TAG, "onResult: \"$text\"  (raw=$hypothesis)")
             if (text.isNotBlank()) _events.tryEmit(Event(text, isFinal = true))
         }
 
         override fun onFinalResult(hypothesis: String) {
             val text = parseField(hypothesis, "text")
+            Log.d(TAG, "onFinalResult: \"$text\"  (raw=$hypothesis)")
             if (text.isNotBlank()) _events.tryEmit(Event(text, isFinal = true))
         }
 
