@@ -81,6 +81,11 @@ fun PreferencesScreen(onBack: () -> Unit) {
                 verbose = settings.verbose,
                 onChange = { v -> scope.launch { repo.setVerbose(v) } },
             )
+            HorizontalDivider()
+            FogModeSection(
+                fogMode = settings.fogMode,
+                onChange = { v -> scope.launch { repo.setFogMode(v) } },
+            )
             Text(
                 "Changes apply immediately. Skill level applies to new games only — " +
                     "in-progress games keep the level they started with.",
@@ -189,6 +194,40 @@ private fun VerbositySection(verbose: Boolean, onChange: (Boolean) -> Unit) {
             )
         }
         Switch(checked = verbose, onCheckedChange = onChange)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FogModeSection(
+    fogMode: SettingsRepository.FogMode,
+    onChange: (SettingsRepository.FogMode) -> Unit,
+) {
+    val entries = SettingsRepository.FogMode.entries
+    Column {
+        Text("Board fog default", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Initial fog state when opening Board view. Per-square taps override after entry.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.padding(top = 8.dp)) {
+            entries.forEachIndexed { idx, opt ->
+                SegmentedButton(
+                    selected = opt == fogMode,
+                    onClick = { onChange(opt) },
+                    shape = SegmentedButtonDefaults.itemShape(idx, entries.size),
+                    label = {
+                        Text(
+                            when (opt) {
+                                SettingsRepository.FogMode.FogAll -> "all"
+                                SettingsRepository.FogMode.FogOpponent -> "opponent"
+                                SettingsRepository.FogMode.RevealAll -> "none"
+                            }
+                        )
+                    },
+                )
+            }
+        }
     }
 }
 

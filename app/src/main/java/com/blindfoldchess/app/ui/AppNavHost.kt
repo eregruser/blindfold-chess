@@ -16,6 +16,7 @@ object Routes {
     const val GameHistory = "settings/game_history"
     const val GameDetail = "settings/game_history/{gameId}"
     const val Preferences = "settings/preferences"
+    const val Board = "settings/board"
 
     fun gameDetail(gameId: Long) = "settings/game_history/$gameId"
 }
@@ -34,11 +35,15 @@ fun AppNavHost() {
                 onOpenVoiceTest = { nav.navigate(Routes.VoiceTest) },
                 onOpenGameHistory = { nav.navigate(Routes.GameHistory) },
                 onOpenPreferences = { nav.navigate(Routes.Preferences) },
+                onOpenBoard = { nav.navigate(Routes.Board) },
                 onBack = { nav.popBackStack() },
             )
         }
         composable(Routes.Preferences) {
             PreferencesScreen(onBack = { nav.popBackStack() })
+        }
+        composable(Routes.Board) {
+            com.blindfoldchess.app.ui.board.BoardScreen(onBack = { nav.popBackStack() })
         }
         composable(Routes.HeadphoneTest) {
             HeadphoneTestScreen(onBack = { nav.popBackStack() })

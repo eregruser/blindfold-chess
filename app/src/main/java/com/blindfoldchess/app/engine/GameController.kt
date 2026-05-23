@@ -67,6 +67,8 @@ class GameController(
         val lastPartialText: String = "",
         val lastFinalText: String? = null,
         val message: String? = null,
+        /** Snapshot of the engine's current position. Updated after every move. */
+        val board: Board? = null,
     ) {
         val whoseTurn: Color get() = if (moves.size % 2 == 0) Color.White else Color.Black
     }
@@ -118,6 +120,7 @@ class GameController(
             _state.update {
                 State(status = Status.WaitingForUser, legalMoves = initialLegal)
             }
+            refreshBoard()
             tts.speak("your move")
         } catch (t: Throwable) {
             Log.w(TAG, "startGame failed", t)
@@ -129,6 +132,12 @@ class GameController(
         val active = repo.findActive() ?: return
         Log.i(TAG, "Marking previously-active game ${active.id} as Abandoned")
         repo.markComplete(active.id, GameResult.Abandoned)
+    }
+
+    /** Snapshot the engine's current position into [State.board]. Best-effort. */
+    private suspend fun refreshBoard() {
+        val board = runCatching { engine.currentBoard() }.getOrNull() ?: return
+        _state.update { it.copy(board = board) }
     }
 
     /**
@@ -182,6 +191,7 @@ class GameController(
                     legalMoves = legal,
                 )
             }
+            refreshBoard()
             tts.speak("game resumed")
             if (lastEngineMove != null) {
                 tts.speak("last engine move: ${MoveSpeech.spoken(lastEngineMove, currentSettings().notation)}")
@@ -265,6 +275,24 @@ class GameController(
     fun cancelListenWindow() {
         listenJob?.cancel()
         listenJob = null
+    }
+
+    /**
+     * Submits a UCI move from a non-voice input path (board long-press, debug UI). Same
+     * validation as [processSpoken]: must be the user's turn and the move must be in
+     * [State.legalMoves]; otherwise TTS "illegal" and no state change.
+     */
+    suspend fun submitTextMove(uci: String) {
+        if (_state.value.status != Status.WaitingForUser) {
+            Log.w(TAG, "submitTextMove ignored in status=${_state.value.status}")
+            return
+        }
+        if (uci !in _state.value.legalMoves) {
+            Log.w(TAG, "submitTextMove: \"$uci\" not in legal moves")
+            tts.speak("illegal")
+            return
+        }
+        playUserMove(uci)
     }
 
     /** Re-speaks the last engine move. No-op if no engine move yet. */
@@ -370,6 +398,7 @@ class GameController(
                 message = null,
             )
         }
+        refreshBoard()
         persistMoves()
         tts.speak("taken back")
     }
@@ -425,6 +454,7 @@ class GameController(
         val initialLegal = engine.perft(1)
         currentGameId = repo.startNewGame(skillLevel = s.skillLevel)
         _state.value = State(status = Status.WaitingForUser, legalMoves = initialLegal)
+        refreshBoard()
         tts.speak("new game. your move.")
     }
 
@@ -499,6 +529,7 @@ class GameController(
                             message = "Game over",
                         )
                     }
+                    refreshBoard()
                     persistMoves()
                     finalizeGame(GameResult.UserWin)
                     tts.speak("game over")
@@ -517,6 +548,7 @@ class GameController(
                             message = if (userHasNoMoves) "Game over" else null,
                         )
                     }
+                    refreshBoard()
                     persistMoves()
                     if (userHasNoMoves) {
                         // Could be mate or stalemate — we don't distinguish for now (Phase 6+).

@@ -25,6 +25,7 @@ fun SettingsScreen(
     onOpenVoiceTest: () -> Unit,
     onOpenGameHistory: () -> Unit,
     onOpenPreferences: () -> Unit,
+    onOpenBoard: () -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -46,8 +47,14 @@ fun SettingsScreen(
         ) {
             ListItem(
                 headlineContent = { Text("Game preferences") },
-                supportingContent = { Text("Engine strength, think time, spoken notation, verbosity") },
+                supportingContent = { Text("Engine strength, think time, spoken notation, verbosity, fog default") },
                 modifier = Modifier.clickable(onClick = onOpenPreferences),
+            )
+            HorizontalDivider()
+            ListItem(
+                headlineContent = { Text("Board view") },
+                supportingContent = { Text("Visualize the current position; tap squares to peek through fog") },
+                modifier = Modifier.clickable(onClick = onOpenBoard),
             )
             HorizontalDivider()
             ListItem(

@@ -131,6 +131,14 @@ class ChessGameService : Service() {
                 gameController.stopGame()
                 updateState { copy(gameActive = false) }
             }
+            ACTION_SUBMIT_MOVE -> {
+                val uci = intent.getStringExtra(EXTRA_MOVE_UCI)
+                if (uci.isNullOrBlank()) {
+                    Log.w(TAG, "ACTION_SUBMIT_MOVE missing $EXTRA_MOVE_UCI extra")
+                } else {
+                    serviceScope.launch { gameController.submitTextMove(uci) }
+                }
+            }
             ACTION_ENABLE_TEST_MODE -> updateState { copy(testModeActive = true) }
             ACTION_DISABLE_TEST_MODE -> updateState { copy(testModeActive = false) }
             else -> Log.w(TAG, "Unknown start action: ${intent?.action}")
@@ -285,9 +293,11 @@ class ChessGameService : Service() {
         private const val ACTION_START_GAME = "com.blindfoldchess.app.action.START_GAME"
         private const val ACTION_RESUME_GAME = "com.blindfoldchess.app.action.RESUME_GAME"
         private const val ACTION_STOP_GAME = "com.blindfoldchess.app.action.STOP_GAME"
+        private const val ACTION_SUBMIT_MOVE = "com.blindfoldchess.app.action.SUBMIT_MOVE"
         private const val ACTION_ENABLE_TEST_MODE = "com.blindfoldchess.app.action.ENABLE_TEST_MODE"
         private const val ACTION_DISABLE_TEST_MODE = "com.blindfoldchess.app.action.DISABLE_TEST_MODE"
         private const val EXTRA_GAME_ID = "gameId"
+        private const val EXTRA_MOVE_UCI = "moveUci"
 
         private val _state = MutableStateFlow(State())
         val state: StateFlow<State> = _state.asStateFlow()
@@ -304,6 +314,14 @@ class ChessGameService : Service() {
             val intent = Intent(context, ChessGameService::class.java)
                 .setAction(ACTION_RESUME_GAME)
                 .putExtra(EXTRA_GAME_ID, gameId)
+            context.startForegroundService(intent)
+        }
+
+        /** Submits a UCI move from a non-voice path (board long-press, debug UI). */
+        fun submitMove(context: Context, uci: String) {
+            val intent = Intent(context, ChessGameService::class.java)
+                .setAction(ACTION_SUBMIT_MOVE)
+                .putExtra(EXTRA_MOVE_UCI, uci)
             context.startForegroundService(intent)
         }
 

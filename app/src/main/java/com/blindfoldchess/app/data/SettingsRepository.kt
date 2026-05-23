@@ -24,11 +24,25 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
 
     enum class Notation { LetterByLetter, Nato }
 
+    /**
+     * Initial fog state when opening the Board view. After entry, the user toggles individual
+     * squares with taps; this only controls the default.
+     */
+    enum class FogMode {
+        /** All 64 squares start fogged — true blindfold practice. */
+        FogAll,
+        /** Opponent's piece squares fogged; user's pieces and empty squares revealed. */
+        FogOpponent,
+        /** Everything visible. */
+        RevealAll,
+    }
+
     data class Settings(
         val skillLevel: Int = DEFAULT_SKILL,
         val moveTimeMs: Long = DEFAULT_MOVE_TIME_MS,
         val notation: Notation = Notation.LetterByLetter,
         val verbose: Boolean = false,
+        val fogMode: FogMode = FogMode.FogAll,
     )
 
     private val store: DataStore<Preferences> = context.applicationContext.dataStore
@@ -45,6 +59,8 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
                 notation = prefs[KEY_NOTATION]?.let { runCatching { Notation.valueOf(it) }.getOrNull() }
                     ?: Notation.LetterByLetter,
                 verbose = prefs[KEY_VERBOSE] ?: false,
+                fogMode = prefs[KEY_FOG_MODE]?.let { runCatching { FogMode.valueOf(it) }.getOrNull() }
+                    ?: FogMode.FogAll,
             )
         }
         .stateIn(scope, SharingStarted.Eagerly, Settings())
@@ -67,6 +83,10 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         store.edit { it[KEY_VERBOSE] = verbose }
     }
 
+    suspend fun setFogMode(mode: FogMode) {
+        store.edit { it[KEY_FOG_MODE] = mode.name }
+    }
+
     companion object {
         const val DEFAULT_SKILL = 5
         const val DEFAULT_MOVE_TIME_MS = 500L
@@ -75,6 +95,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         private val KEY_MOVE_TIME = longPreferencesKey("move_time_ms")
         private val KEY_NOTATION = stringPreferencesKey("tts_notation")
         private val KEY_VERBOSE = booleanPreferencesKey("tts_verbose")
+        private val KEY_FOG_MODE = stringPreferencesKey("fog_mode")
     }
 }
 
