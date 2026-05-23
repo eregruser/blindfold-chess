@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.BlindfoldChess" parent="android:Theme.DeviceDefault.NoActionBar" />
+</resources>
