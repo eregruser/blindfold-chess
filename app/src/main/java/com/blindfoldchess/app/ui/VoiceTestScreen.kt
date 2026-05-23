@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.blindfoldchess.app.voice.MoveParser
 import com.blindfoldchess.app.voice.VoskRecognizer
 import kotlinx.coroutines.launch
 
@@ -48,6 +49,7 @@ import kotlinx.coroutines.launch
 fun VoiceTestScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val recognizer = remember { VoskRecognizer(context) }
+    val parser = remember { MoveParser() }
     val state by recognizer.state.collectAsStateWithLifecycle()
     val partial = remember { mutableStateOf("") }
     val finals = remember { mutableStateListOf<String>() }
@@ -69,7 +71,14 @@ fun VoiceTestScreen(onBack: () -> Unit) {
     LaunchedEffect(recognizer) {
         recognizer.events.collect { event ->
             if (event.isFinal) {
-                finals.add(event.text)
+                val parsed = parser.parse(event.text)
+                val parsedLabel = when (parsed) {
+                    is MoveParser.Parsed.Normal -> "→ ${parsed.toUci()}"
+                    MoveParser.Parsed.CastleKingside -> "→ castle-kingside"
+                    MoveParser.Parsed.CastleQueenside -> "→ castle-queenside"
+                    null -> "→ (unparseable)"
+                }
+                finals.add("${event.text}    $parsedLabel")
                 partial.value = ""
             } else {
                 partial.value = event.text
@@ -111,10 +120,10 @@ fun VoiceTestScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "Phase 3a bare ASR. Loads the small English Vosk model and streams " +
-                    "recognized text. No grammar, no engine — say anything to verify the " +
-                    "mic + ASR pipeline. Try \"echo two to echo four\" for the eventual " +
-                    "move-parser pattern.",
+                "Phase 3b. Recognized text runs through MoveParser — try \"e two to e four\", " +
+                    "\"echo seven echo five\", \"castle kingside\", \"e seven to e eight promote " +
+                    "to queen\". The arrow shows the parser's output (UCI or castle marker). " +
+                    "ASR accuracy is rough without grammar — Phase 4 fixes that.",
                 style = MaterialTheme.typography.bodyMedium,
             )
 

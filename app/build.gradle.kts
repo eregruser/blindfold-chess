@@ -86,4 +86,6 @@ dependencies {
     implementation(libs.vosk.android)
 
     debugImplementation(libs.androidx.ui.tooling)
+
+    testImplementation(libs.junit)
 }
