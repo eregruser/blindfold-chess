@@ -51,6 +51,7 @@ class GameController(
     data class State(
         val status: Status = Status.Idle,
         val moves: List<String> = emptyList(),
+        val legalMoves: List<String> = emptyList(),
         val lastEngineMove: String? = null,
         val lastPartialText: String = "",
         val lastFinalText: String? = null,
@@ -88,7 +89,11 @@ class GameController(
             }
             engine.newGame()
             recognizer.ensureModel()
-            _state.update { State(status = Status.WaitingForUser) }
+            engine.setPosition(startFen = null, moves = emptyList())
+            val initialLegal = engine.perft(1)
+            _state.update {
+                State(status = Status.WaitingForUser, legalMoves = initialLegal)
+            }
             tts.speak("your move")
         } catch (t: Throwable) {
             Log.w(TAG, "startGame failed", t)
@@ -126,7 +131,8 @@ class GameController(
             _state.update { it.copy(status = Status.Listening, lastPartialText = "", lastFinalText = null) }
             earcons.listenStart()
             try {
-                recognizer.startListening(grammar = ChessGrammar.fullBoard)
+                val grammar = ChessGrammar.legal(_state.value.legalMoves)
+                recognizer.startListening(grammar = grammar)
                 val partialCollector = launch {
                     recognizer.events.filter { !it.isFinal }.collect { event ->
                         _state.update { it.copy(lastPartialText = event.text) }
@@ -183,6 +189,12 @@ class GameController(
             return
         }
         val uci = resolveToUci(parsed)
+        if (uci !in _state.value.legalMoves) {
+            Log.i(TAG, "Rejecting illegal move \"$uci\" (parsed from \"$text\")")
+            tts.speak("illegal")
+            _state.update { it.copy(status = Status.WaitingForUser) }
+            return
+        }
         playUserMove(uci)
     }
 
@@ -203,18 +215,31 @@ class GameController(
                 val gameOver = reply == "(none)" || reply == "0000" || reply.isBlank()
                 if (gameOver) {
                     _state.update {
-                        it.copy(status = Status.GameOver, lastEngineMove = null, message = "Game over")
+                        it.copy(
+                            status = Status.GameOver,
+                            lastEngineMove = null,
+                            legalMoves = emptyList(),
+                            message = "Game over",
+                        )
                     }
                     tts.speak("game over")
                 } else {
+                    // Apply engine reply to position, then refresh legal moves for the next turn.
+                    val newMoves = _state.value.moves + reply
+                    engine.setPosition(startFen = null, moves = newMoves)
+                    val nextLegal = engine.perft(1)
+                    val terminal = nextLegal.isEmpty()
                     _state.update {
                         it.copy(
-                            status = Status.WaitingForUser,
-                            moves = it.moves + reply,
+                            status = if (terminal) Status.GameOver else Status.WaitingForUser,
+                            moves = newMoves,
                             lastEngineMove = reply,
+                            legalMoves = nextLegal,
+                            message = if (terminal) "Game over" else null,
                         )
                     }
                     tts.speak(MoveSpeech.spoken(reply))
+                    if (terminal) tts.speak("game over")
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "playUserMove failed", t)

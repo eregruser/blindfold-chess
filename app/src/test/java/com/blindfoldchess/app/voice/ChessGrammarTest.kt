@@ -83,6 +83,48 @@ class ChessGrammarTest {
         assertEquals(0, countOccurrences(grammar, "\"\""))
     }
 
+    // ---------- ChessGrammar.legal ----------
+
+    @Test fun legalGrammarContainsEachMove() {
+        val moves = listOf("e2e4", "d2d4", "g1f3")
+        val g = ChessGrammar.legal(moves)
+        assertTrue(g.contains("\"echo two echo four\""))
+        assertTrue(g.contains("\"delta two delta four\""))
+        assertTrue(g.contains("\"golf one foxtrot three\""))
+        assertTrue(g.contains("\"[unk]\""))
+    }
+
+    @Test fun legalGrammarExpandsCastlingAliases() {
+        val g = ChessGrammar.legal(listOf("e1g1"))
+        assertTrue(g.contains("\"castle king side\""))
+        assertTrue(g.contains("\"short castle\""))
+    }
+
+    @Test fun legalGrammarHandlesBlackCastle() {
+        val g = ChessGrammar.legal(listOf("e8c8"))
+        assertTrue(g.contains("\"castle queen side\""))
+        assertTrue(g.contains("\"long castle\""))
+    }
+
+    @Test fun legalGrammarHandlesPromotion() {
+        val g = ChessGrammar.legal(listOf("e7e8q", "e7e8n"))
+        assertTrue(g.contains("\"echo seven echo eight promote queen\""))
+        assertTrue(g.contains("\"echo seven echo eight promote knight\""))
+    }
+
+    @Test fun legalGrammarEmptyListStillValid() {
+        val g = ChessGrammar.legal(emptyList())
+        assertTrue(g.startsWith("[\""))
+        assertTrue(g.endsWith("\"]"))
+        assertTrue(g.contains("\"[unk]\""))
+    }
+
+    @Test fun legalGrammarSmallerThanFullBoard() {
+        val small = ChessGrammar.legal(listOf("e2e4", "d2d4", "g1f3", "b1c3"))
+        // Should be a few hundred bytes, far smaller than fullBoard's ~750KB
+        assertTrue("legal size=${small.length}", small.length < 1_000)
+    }
+
     private fun countOccurrences(s: String, sub: String): Int {
         if (sub.isEmpty()) return 0
         var count = 0
