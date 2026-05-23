@@ -10,7 +10,6 @@ object Routes {
     const val Settings = "settings"
     const val HeadphoneTest = "settings/headphone_test"
     const val EngineSelfTest = "settings/engine_self_test"
-    const val PlayVsEngine = "settings/play_vs_engine"
     const val VoiceTest = "settings/voice_test"
 }
 
@@ -25,7 +24,6 @@ fun AppNavHost() {
             SettingsScreen(
                 onOpenHeadphoneTest = { nav.navigate(Routes.HeadphoneTest) },
                 onOpenEngineSelfTest = { nav.navigate(Routes.EngineSelfTest) },
-                onOpenPlayVsEngine = { nav.navigate(Routes.PlayVsEngine) },
                 onOpenVoiceTest = { nav.navigate(Routes.VoiceTest) },
                 onBack = { nav.popBackStack() },
             )
@@ -35,9 +33,6 @@ fun AppNavHost() {
         }
         composable(Routes.EngineSelfTest) {
             EngineSelfTestScreen(onBack = { nav.popBackStack() })
-        }
-        composable(Routes.PlayVsEngine) {
-            PlayVsEngineScreen(onBack = { nav.popBackStack() })
         }
         composable(Routes.VoiceTest) {
             VoiceTestScreen(onBack = { nav.popBackStack() })

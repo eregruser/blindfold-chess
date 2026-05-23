@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 fun SettingsScreen(
     onOpenHeadphoneTest: () -> Unit,
     onOpenEngineSelfTest: () -> Unit,
-    onOpenPlayVsEngine: () -> Unit,
     onOpenVoiceTest: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -53,12 +52,6 @@ fun SettingsScreen(
                 headlineContent = { Text("Engine self-test") },
                 supportingContent = { Text("Load embedded Stockfish and drive it via UCI commands") },
                 modifier = Modifier.clickable(onClick = onOpenEngineSelfTest),
-            )
-            HorizontalDivider()
-            ListItem(
-                headlineContent = { Text("Play vs engine (text)") },
-                supportingContent = { Text("Type UCI moves; engine replies with adjustable Skill Level") },
-                modifier = Modifier.clickable(onClick = onOpenPlayVsEngine),
             )
             HorizontalDivider()
             ListItem(
