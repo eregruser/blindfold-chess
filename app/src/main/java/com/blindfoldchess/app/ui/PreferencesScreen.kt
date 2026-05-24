@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blindfoldchess.app.BlindfoldChessApp
+import com.blindfoldchess.app.chess.Color
 import com.blindfoldchess.app.data.SettingsRepository
 import kotlinx.coroutines.launch
 
@@ -62,6 +63,11 @@ fun PreferencesScreen(onBack: () -> Unit) {
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
+            UserColorSection(
+                userColor = settings.userColor,
+                onChange = { v -> scope.launch { repo.setUserColor(v) } },
+            )
+            HorizontalDivider()
             SkillSection(
                 level = settings.skillLevel,
                 onChange = { v -> scope.launch { repo.setSkillLevel(v) } },
@@ -91,6 +97,29 @@ fun PreferencesScreen(onBack: () -> Unit) {
                     "in-progress games keep the level they started with.",
                 style = MaterialTheme.typography.bodySmall,
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun UserColorSection(userColor: Color, onChange: (Color) -> Unit) {
+    val entries = Color.entries
+    Column {
+        Text("Play as", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Applies to new games. In-progress games keep the color they started with.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.padding(top = 8.dp)) {
+            entries.forEachIndexed { idx, opt ->
+                SegmentedButton(
+                    selected = opt == userColor,
+                    onClick = { onChange(opt) },
+                    shape = SegmentedButtonDefaults.itemShape(idx, entries.size),
+                    label = { Text(opt.name.lowercase()) },
+                )
+            }
         }
     }
 }
@@ -155,8 +184,10 @@ private fun NotationSection(
     Column {
         Text("Spoken notation", style = MaterialTheme.typography.titleMedium)
         Text(
-            "How engine moves are announced via TTS. NATO is more distinctive over noisy " +
-                "audio; letter-by-letter is shorter.",
+            "How engine moves are announced via TTS.\n" +
+                "  • letter — \"e 7 e 5\"\n" +
+                "  • NATO — \"echo seven echo five\" (most distinctive over noisy audio)\n" +
+                "  • standard — \"e five\", \"knight f three\", \"castle kingside\"",
             style = MaterialTheme.typography.bodySmall,
         )
         SingleChoiceSegmentedButtonRow(modifier = Modifier.padding(top = 8.dp)) {
@@ -168,9 +199,9 @@ private fun NotationSection(
                     label = {
                         Text(
                             when (opt) {
-                                SettingsRepository.Notation.LetterByLetter -> "letter (e 7 e 5)"
-                                SettingsRepository.Notation.Nato -> "NATO (echo 7 echo 5)"
-                                SettingsRepository.Notation.Standard -> "standard (e5 / Nf3)"
+                                SettingsRepository.Notation.LetterByLetter -> "letter"
+                                SettingsRepository.Notation.Nato -> "NATO"
+                                SettingsRepository.Notation.Standard -> "standard"
                             }
                         )
                     },

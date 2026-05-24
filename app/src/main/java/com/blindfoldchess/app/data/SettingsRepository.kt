@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.blindfoldchess.app.chess.Color
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -53,6 +54,8 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         val notation: Notation = Notation.LetterByLetter,
         val verbose: Boolean = false,
         val fogMode: FogMode = FogMode.FogAll,
+        /** Side the human plays at the next game start. In-progress games keep theirs. */
+        val userColor: Color = Color.White,
     )
 
     private val store: DataStore<Preferences> = context.applicationContext.dataStore
@@ -71,6 +74,8 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
                 verbose = prefs[KEY_VERBOSE] ?: false,
                 fogMode = prefs[KEY_FOG_MODE]?.let { runCatching { FogMode.valueOf(it) }.getOrNull() }
                     ?: FogMode.FogAll,
+                userColor = prefs[KEY_USER_COLOR]?.let { runCatching { Color.valueOf(it) }.getOrNull() }
+                    ?: Color.White,
             )
         }
         .stateIn(scope, SharingStarted.Eagerly, Settings())
@@ -97,6 +102,10 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         store.edit { it[KEY_FOG_MODE] = mode.name }
     }
 
+    suspend fun setUserColor(color: Color) {
+        store.edit { it[KEY_USER_COLOR] = color.name }
+    }
+
     companion object {
         const val DEFAULT_SKILL = 5
         const val DEFAULT_MOVE_TIME_MS = 500L
@@ -106,6 +115,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         private val KEY_NOTATION = stringPreferencesKey("tts_notation")
         private val KEY_VERBOSE = booleanPreferencesKey("tts_verbose")
         private val KEY_FOG_MODE = stringPreferencesKey("fog_mode")
+        private val KEY_USER_COLOR = stringPreferencesKey("user_color")
     }
 }
 

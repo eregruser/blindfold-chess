@@ -63,8 +63,9 @@ fun BoardScreen(onBack: () -> Unit) {
     val serviceState by ChessGameService.state.collectAsStateWithLifecycle()
     val settings by app.settingsRepository.settings.collectAsStateWithLifecycle()
 
-    // v1 hardcodes the user as White (matches GameController).
-    val userColor = Color.White
+    // Comes from the live game state. Falls back to the user's preference when no game is
+    // active (so board orientation matches what they'd see when they start one).
+    val userColor: Color = if (serviceState.gameActive) gameState.userColor else settings.userColor
 
     val displayBoard: Board = gameState.board ?: Fen.parse(STARTPOS_FEN)
 

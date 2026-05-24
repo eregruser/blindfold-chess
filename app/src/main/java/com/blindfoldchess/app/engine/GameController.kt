@@ -72,6 +72,8 @@ class GameController(
         val message: String? = null,
         /** Snapshot of the engine's current position. Updated after every move. */
         val board: Board? = null,
+        /** Which side the human is playing in the current game. */
+        val userColor: Color = Color.White,
     ) {
         val whoseTurn: Color get() = if (moves.size % 2 == 0) Color.White else Color.Black
     }
@@ -81,9 +83,6 @@ class GameController(
     private val recognizer = VoskRecognizer(context)
     private val assets = EngineAssets(context)
     private val commandParser = VoiceCommandParser(MoveParser())
-
-    /** The human side. v1 hard-codes white; settings toggle will arrive later. */
-    private val userColor: Color = Color.White
 
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
@@ -122,13 +121,26 @@ class GameController(
 
             // Abandon any previously-active game and create a fresh row for this session.
             abandonAnyActiveGame()
-            currentGameId = repo.startNewGame(skillLevel = s.skillLevel)
+            currentGameId = repo.startNewGame(
+                skillLevel = s.skillLevel,
+                userColor = s.userColor.name,
+            )
 
+            val userIsWhite = s.userColor == Color.White
             _state.update {
-                State(status = Status.WaitingForUser, legalMoves = initialLegal)
+                State(
+                    status = if (userIsWhite) Status.WaitingForUser else Status.Thinking,
+                    legalMoves = if (userIsWhite) initialLegal else emptyList(),
+                    userColor = s.userColor,
+                )
             }
             refreshBoard()
-            tts.speak("your move")
+            if (userIsWhite) {
+                tts.speak("your move")
+            } else {
+                // Engine moves first when the human plays black.
+                runEngineReply()
+            }
         } catch (t: Throwable) {
             Log.w(TAG, "startGame failed", t)
             _state.update { it.copy(status = Status.Error, message = t.message ?: "unknown error") }
@@ -187,15 +199,19 @@ class GameController(
             val legal = engine.perft(1)
             currentGameId = game.id
 
-            // lastEngineMove is the latest move IF the move count is even (which it should be,
-            // since persistMoves only runs after engine replies).
-            val lastEngineMove = if (moves.isNotEmpty() && moves.size % 2 == 0) moves.last() else null
+            val resumedUserColor = runCatching { Color.valueOf(game.userColor) }
+                .getOrDefault(Color.White)
+
+            // persistMoves always runs after the engine reply, so saved state is at the user's
+            // turn and the last move (if any) was played by the engine.
+            val lastEngineMove = moves.lastOrNull()
             _state.update {
                 State(
                     status = Status.WaitingForUser,
                     moves = moves,
                     lastEngineMove = lastEngineMove,
                     legalMoves = legal,
+                    userColor = resumedUserColor,
                 )
             }
             refreshBoard()
@@ -454,7 +470,7 @@ class GameController(
 
     private suspend fun handleListPieces() = gameLock.withLock {
         val board = engine.currentBoard()
-        val phrase = describePieces(board, userColor)
+        val phrase = describePieces(board, _state.value.userColor)
         tts.speak("your pieces: $phrase")
     }
 
@@ -491,10 +507,24 @@ class GameController(
         engine.newGame()
         engine.setPosition(startFen = null, moves = emptyList())
         val initialLegal = engine.perft(1)
-        currentGameId = repo.startNewGame(skillLevel = s.skillLevel)
-        _state.value = State(status = Status.WaitingForUser, legalMoves = initialLegal)
+        currentGameId = repo.startNewGame(
+            skillLevel = s.skillLevel,
+            userColor = s.userColor.name,
+        )
+
+        val userIsWhite = s.userColor == Color.White
+        _state.value = State(
+            status = if (userIsWhite) Status.WaitingForUser else Status.Thinking,
+            legalMoves = if (userIsWhite) initialLegal else emptyList(),
+            userColor = s.userColor,
+        )
         refreshBoard()
-        tts.speak("new game. your move.")
+        if (userIsWhite) {
+            tts.speak("new game. your move.")
+        } else {
+            tts.speak("new game")
+            runEngineReply()
+        }
     }
 
     private suspend fun handleWhatsOn(square: String) = gameLock.withLock {
@@ -600,50 +630,66 @@ class GameController(
             _state.update { it.copy(status = Status.Thinking, moves = it.moves + uci) }
             try {
                 engine.setPosition(startFen = null, moves = _state.value.moves)
-                val reply = engine.goMoveTime(currentSettings().moveTimeMs)
-                val userMatedEngine = reply == "(none)" || reply == "0000" || reply.isBlank()
-                if (userMatedEngine) {
-                    _state.update {
-                        it.copy(
-                            status = Status.GameOver,
-                            lastEngineMove = null,
-                            legalMoves = emptyList(),
-                            message = "Game over",
-                        )
-                    }
-                    refreshBoard()
-                    persistMoves()
-                    finalizeGame(GameResult.UserWin)
-                    tts.speak("game over")
-                } else {
-                    // Apply engine reply to position, then refresh legal moves for the next turn.
-                    val newMoves = _state.value.moves + reply
-                    engine.setPosition(startFen = null, moves = newMoves)
-                    val nextLegal = engine.perft(1)
-                    val userHasNoMoves = nextLegal.isEmpty()
-                    _state.update {
-                        it.copy(
-                            status = if (userHasNoMoves) Status.GameOver else Status.WaitingForUser,
-                            moves = newMoves,
-                            lastEngineMove = reply,
-                            legalMoves = nextLegal,
-                            message = if (userHasNoMoves) "Game over" else null,
-                        )
-                    }
-                    refreshBoard()
-                    persistMoves()
-                    if (userHasNoMoves) {
-                        // Could be mate or stalemate — we don't distinguish for now (Phase 6+).
-                        finalizeGame(GameResult.UserLoss)
-                    }
-                    announceEngineMove(reply)
-                    if (userHasNoMoves) tts.speak("game over")
-                }
+                runEngineReply()
             } catch (t: Throwable) {
                 Log.w(TAG, "playUserMove failed", t)
                 _state.update { it.copy(status = Status.Error, message = t.message ?: "unknown") }
             }
         }
+    }
+
+    /**
+     * Runs one engine ply at the current position. Caller is responsible for [gameLock]
+     * being held and [engine.setPosition] having been called with the current move list.
+     *
+     * Updates [_state] with the engine's move, refreshed legal moves, board, and
+     * appropriate game-over classification:
+     *   - engine returns no move ("(none)"/"0000"/"") → UserWin (only reachable after the
+     *     user's move just delivered mate; impossible at startpos)
+     *   - perft after engine's reply is empty → UserLoss (mate or stalemate — we don't
+     *     yet distinguish; would need to query check status)
+     *
+     * Persists moves, marks the game complete in the right cases, announces the engine's
+     * move via [announceEngineMove], and TTS "game over" when applicable.
+     */
+    private suspend fun runEngineReply() {
+        val reply = engine.goMoveTime(currentSettings().moveTimeMs)
+        val noReply = reply == "(none)" || reply == "0000" || reply.isBlank()
+        if (noReply) {
+            _state.update {
+                it.copy(
+                    status = Status.GameOver,
+                    lastEngineMove = null,
+                    legalMoves = emptyList(),
+                    message = "Game over",
+                )
+            }
+            refreshBoard()
+            persistMoves()
+            finalizeGame(GameResult.UserWin)
+            tts.speak("game over")
+            return
+        }
+        val newMoves = _state.value.moves + reply
+        engine.setPosition(startFen = null, moves = newMoves)
+        val nextLegal = engine.perft(1)
+        val userHasNoMoves = nextLegal.isEmpty()
+        _state.update {
+            it.copy(
+                status = if (userHasNoMoves) Status.GameOver else Status.WaitingForUser,
+                moves = newMoves,
+                lastEngineMove = reply,
+                legalMoves = nextLegal,
+                message = if (userHasNoMoves) "Game over" else null,
+            )
+        }
+        refreshBoard()
+        persistMoves()
+        if (userHasNoMoves) {
+            finalizeGame(GameResult.UserLoss)
+        }
+        announceEngineMove(reply)
+        if (userHasNoMoves) tts.speak("game over")
     }
 
     /** Write the current move list to the active game row. No-op if no active game id. */
