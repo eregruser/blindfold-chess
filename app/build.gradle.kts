@@ -53,10 +53,22 @@ android {
     }
 
     // Stockfish NNUE network files (~108MB) and the Vosk speech model (~68MB) live in a
-    // separate install-time asset pack so the base APK stays under Play Store's 200MB limit.
-    // AssetManager merges pack assets into the app's namespace at runtime; the existing
-    // EngineAssets and VoskRecognizer code uses them transparently.
+    // separate install-time asset pack so the base AAB stays under Play Store's 200MB
+    // limit. Play merges the pack into the app's AssetManager namespace at install
+    // time; the existing EngineAssets and VoskRecognizer code uses them transparently.
     assetPacks += setOf(":engineassets")
+
+    // assetPacks only delivers contents into AAB builds (where Play handles the merge).
+    // For APK builds — most importantly the debug variant that Android Studio "Run"
+    // installs — the pack's contents are NOT auto-merged into the base APK, so the
+    // app would crash at startup looking for vosk-model-.../uuid. Re-expose the pack's
+    // assets directory on the debug source set so installDebug ships a usable APK.
+    // Release sideloads (rare) still need bundletool install-apks from the AAB.
+    sourceSets {
+        getByName("debug") {
+            assets.srcDirs("../engineassets/src/main/assets")
+        }
+    }
 
     signingConfigs {
         create("release") {

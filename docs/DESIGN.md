@@ -212,9 +212,12 @@ keycode, repeat count, timestamp). This is essential because:
   ./scripts/fetch_nnue.sh
   ```
   Downloads from `tests.stockfishchess.org` into the asset-pack module.
-- Base APK size impact: zero — the pack ships separately as install-time delivery from
-  Play Store. Dev / debug builds bundle the assets into the debug APK directly so
-  Android Studio "Run" works as before.
+- Base AAB size impact: zero — the pack ships separately as install-time delivery
+  from Play Store. For debug APK builds (Android Studio "Run" / `installDebug`) the
+  asset pack is *not* auto-merged, so `app/build.gradle.kts` re-exposes
+  `engineassets/src/main/assets` on the debug source set; debug APKs end up around
+  170 MB but install correctly. Release sideload of the AAB requires
+  `bundletool install-apks`.
 - AGP `noCompress += "nnue"` avoids re-compressing already-quantized weights.
 
 ### Vosk
