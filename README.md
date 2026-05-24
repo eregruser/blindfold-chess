@@ -3,7 +3,7 @@
 A native Android app for practicing blindfold chess hands-free while commuting or jogging.
 Wear headphones, play full games against Stockfish offline, and interact entirely by voice.
 
-See [DESIGN.md](DESIGN.md) for the detailed design and phasing.
+See [docs/DESIGN.md](docs/DESIGN.md) for the detailed design.
 
 ## Features
 
