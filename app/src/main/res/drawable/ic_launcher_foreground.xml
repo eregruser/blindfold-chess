@@ -1,9 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive-icon foreground: Cburnett knight silhouette, recoloured for a dark
+  background. Paths are taken from piece_bn.xml (CC-BY-SA 3.0, Colin M.L. Burnett;
+  see THIRD_PARTY_NOTICES.md). The knight's natural 45x45 viewport is centred and
+  scaled to 60x60 inside the 108x108 adaptive-icon viewport, leaving a 24-unit
+  margin so the figure stays within the launcher safe zone on every mask shape.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M48,30 L60,30 L60,38 L66,38 L66,46 L60,52 L60,68 L48,68 L48,52 L42,46 L42,38 L48,38 Z M40,72 L68,72 L70,80 L38,80 Z" />
+    <group
+        android:translateX="24"
+        android:translateY="24"
+        android:scaleX="1.3333"
+        android:scaleY="1.3333">
+        <path
+            android:fillColor="#FFF3F4F6"
+            android:fillType="evenOdd"
+            android:strokeColor="#FFF3F4F6"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:strokeWidth="1.5"
+            android:pathData="M22 10c10.5 1 16.5 8 16 29H15c0-9 10-6.5 8-21" />
+        <path
+            android:fillColor="#FFF3F4F6"
+            android:fillType="evenOdd"
+            android:strokeColor="#FFF3F4F6"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:strokeWidth="1.5"
+            android:pathData="M24 18c.38 2.91-5.55 7.37-8 9-3 2-2.82 4.34-5 4-1.04-.94 1.41-3.04 0-3-1 0 .19 1.23-1 2-1 0-4 1-4-4 0-2 6-12 6-12s1.89-1.9 2-3.5c-.73-1-.5-2-.5-3 1-1 3 2.5 3 2.5h2s.78-2 2.5-3c1 0 1 3 1 3" />
+        <path
+            android:fillColor="#FF1F2937"
+            android:fillType="evenOdd"
+            android:strokeColor="#FF1F2937"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:strokeWidth="1.5"
+            android:pathData="M9.5 25.5a.5.5 0 1 1-1 0 .5.5 0 1 1 1 0m5.43-9.75a.5 1.5 30 1 1-.86-.5.5 1.5 30 1 1 .86.5" />
+        <path
+            android:fillColor="#FF1F2937"
+            android:fillType="evenOdd"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:strokeWidth="1.5"
+            android:pathData="m24.55 10.4-.45 1.45.5.15c3.15 1 5.65 2.49 7.9 6.75S35.75 29.06 35.25 39l-.05.5h2.25l.05-.5c.5-10.06-.88-16.85-3.25-21.34s-5.79-6.64-9.19-7.16z" />
+    </group>
 </vector>

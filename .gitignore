@@ -3,12 +3,11 @@
 /local.properties
 /.idea
 .DS_Store
-/build
+build/
 /captures
 .externalNativeBuild
 .cxx
 local.properties
-/app/build
 /app/release
 .kotlin/
 
@@ -22,3 +21,9 @@ engineassets/src/main/assets/*.nnue
 # Vosk speech-recognition model. ~68MB extracted; fetched separately by
 # scripts/fetch_vosk.sh after clone.
 engineassets/src/main/assets/vosk-model-*/
+
+# Release signing secrets. Never commit. See keystore.properties.example for the
+# schema and RELEASING.md for the full keystore-creation flow.
+keystore.properties
+*.jks
+*.keystore
