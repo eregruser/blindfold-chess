@@ -50,9 +50,11 @@ import com.blindfoldchess.app.service.ChessGameService
  * when no game is active). Long-press is only active when a game is in progress and it's
  * the user's turn — otherwise the board is read-only.
  *
- * Default fog state comes from [SettingsRepository.Settings.fogMode]; after entry the user
- * toggles individual squares with taps. "Reset" in the top bar re-applies the default.
- * "Reveal all" clears fog so you can read the position.
+ * Default fog state comes from [SettingsRepository.Settings.fogMode] and is re-applied
+ * on every position change so fogged squares move with the pieces (essential for the
+ * FogOpponent mode). Per-square taps are transient peeks/re-hides scoped to the current
+ * position — once a move lands they reset to the new default. "Reset" in the top bar
+ * also re-applies the default mid-position; "Reveal all" clears fog entirely.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,12 +71,24 @@ fun BoardScreen(onBack: () -> Unit) {
 
     val displayBoard: Board = gameState.board ?: Fen.parse(STARTPOS_FEN)
 
-    var fogged by remember { mutableStateOf(defaultFog(displayBoard, settings.fogMode, userColor)) }
-    val resetKey by remember(settings.fogMode) {
-        derivedStateOf { settings.fogMode }
-    }
-    LaunchedEffect(resetKey) {
-        fogged = defaultFog(displayBoard, settings.fogMode, userColor)
+    // Re-derive default fog whenever the board, mode, or user side changes. Keys on
+    // `displayBoard` (data class with structural equality on its 64-square list) — not
+    // on moves.size — because GameController.runEngineReply emits the new moves first
+    // and then calls refreshBoard() as a separate update; keying on moves.size would
+    // fire against the still-stale board and leave the just-moved opponent piece
+    // visible until the *next* move.
+    //
+    // remember(keys) is used (rather than a LaunchedEffect that mutates a separate
+    // state) so the fresh fog set lands in the same composition as the new board.
+    // A LaunchedEffect runs its block after commit, which would cause one frame where
+    // the new piece renders unfogged before fog catches up.
+    //
+    // Per-square taps are intentionally scoped to the current position: when the
+    // board changes the key changes, remember re-initializes the state, and tap
+    // overrides are wiped. "Reset" still works mid-position to do the same wipe by
+    // hand without waiting for the next move.
+    var fogged by remember(displayBoard, settings.fogMode, userColor) {
+        mutableStateOf(defaultFog(displayBoard, settings.fogMode, userColor))
     }
 
     var selectedSquare by remember { mutableStateOf<String?>(null) }
