@@ -142,6 +142,8 @@ class ChessGameService : Service() {
             ACTION_TAKE_BACK -> {
                 serviceScope.launch { gameController.takeBack() }
             }
+            ACTION_OPEN_LISTEN_WINDOW -> gameController.openListenWindow()
+            ACTION_CANCEL_LISTEN_WINDOW -> gameController.cancelListenWindow()
             ACTION_ENABLE_TEST_MODE -> updateState { copy(testModeActive = true) }
             ACTION_DISABLE_TEST_MODE -> updateState { copy(testModeActive = false) }
             else -> Log.w(TAG, "Unknown start action: ${intent?.action}")
@@ -298,6 +300,8 @@ class ChessGameService : Service() {
         private const val ACTION_STOP_GAME = "com.blindfoldchess.app.action.STOP_GAME"
         private const val ACTION_SUBMIT_MOVE = "com.blindfoldchess.app.action.SUBMIT_MOVE"
         private const val ACTION_TAKE_BACK = "com.blindfoldchess.app.action.TAKE_BACK"
+        private const val ACTION_OPEN_LISTEN_WINDOW = "com.blindfoldchess.app.action.OPEN_LISTEN_WINDOW"
+        private const val ACTION_CANCEL_LISTEN_WINDOW = "com.blindfoldchess.app.action.CANCEL_LISTEN_WINDOW"
         private const val ACTION_ENABLE_TEST_MODE = "com.blindfoldchess.app.action.ENABLE_TEST_MODE"
         private const val ACTION_DISABLE_TEST_MODE = "com.blindfoldchess.app.action.DISABLE_TEST_MODE"
         private const val EXTRA_GAME_ID = "gameId"
@@ -331,6 +335,12 @@ class ChessGameService : Service() {
 
         /** Drops the last user+engine move pair. Mirrors the "take back" voice command. */
         fun takeBack(context: Context) = dispatch(context, ACTION_TAKE_BACK)
+
+        /** Opens an ASR listen window from a non-headset path (on-screen Speak button). */
+        fun openListenWindow(context: Context) = dispatch(context, ACTION_OPEN_LISTEN_WINDOW)
+
+        /** Cancels a listen window from the on-screen Cancel button. */
+        fun cancelListenWindow(context: Context) = dispatch(context, ACTION_CANCEL_LISTEN_WINDOW)
 
         private fun dispatch(context: Context, action: String) {
             val intent = Intent(context, ChessGameService::class.java).setAction(action)

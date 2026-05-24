@@ -178,6 +178,8 @@ fun MainScreen(onOpenSettings: () -> Unit) {
                 onRequestMic = { micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
                 onStartGame = { ChessGameService.startGame(context) },
                 onStopGame = { ChessGameService.stopGame(context) },
+                onSpeak = { ChessGameService.openListenWindow(context) },
+                onCancelSpeak = { ChessGameService.cancelListenWindow(context) },
             )
         }
     }
@@ -279,12 +281,27 @@ private fun ControlRow(
     onRequestMic: () -> Unit,
     onStartGame: () -> Unit,
     onStopGame: () -> Unit,
+    onSpeak: () -> Unit,
+    onCancelSpeak: () -> Unit,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         when {
             !micGranted -> Button(onClick = onRequestMic) { Text("Grant mic permission") }
 
-            serviceState.gameActive -> Button(onClick = onStopGame) { Text("Stop game") }
+            serviceState.gameActive -> {
+                Button(onClick = onStopGame) { Text("Stop game") }
+                // Same gesture as a headset tap: opens a listen window when it's the user's
+                // turn, cancels when already listening. Disabled mid-search.
+                when (gameState.status) {
+                    GameController.Status.Listening -> Button(onClick = onCancelSpeak) {
+                        Text("Cancel")
+                    }
+                    GameController.Status.WaitingForUser -> Button(onClick = onSpeak) {
+                        Text("Speak")
+                    }
+                    else -> Button(onClick = onSpeak, enabled = false) { Text("Speak") }
+                }
+            }
 
             else -> Button(
                 onClick = onStartGame,
