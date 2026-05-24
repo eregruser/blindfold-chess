@@ -18,6 +18,8 @@ object Routes {
     const val Preferences = "settings/preferences"
     const val Board = "settings/board"
     const val VoiceCommands = "settings/voice_commands"
+    const val About = "settings/about"
+    const val Licenses = "settings/licenses"
 
     fun gameDetail(gameId: Long) = "settings/game_history/$gameId"
 }
@@ -38,6 +40,7 @@ fun AppNavHost() {
                 onOpenPreferences = { nav.navigate(Routes.Preferences) },
                 onOpenBoard = { nav.navigate(Routes.Board) },
                 onOpenVoiceCommands = { nav.navigate(Routes.VoiceCommands) },
+                onOpenAbout = { nav.navigate(Routes.About) },
                 onBack = { nav.popBackStack() },
             )
         }
@@ -49,6 +52,15 @@ fun AppNavHost() {
         }
         composable(Routes.VoiceCommands) {
             VoiceCommandsScreen(onBack = { nav.popBackStack() })
+        }
+        composable(Routes.About) {
+            AboutScreen(
+                onOpenLicenses = { nav.navigate(Routes.Licenses) },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.Licenses) {
+            LicensesScreen(onBack = { nav.popBackStack() })
         }
         composable(Routes.HeadphoneTest) {
             HeadphoneTestScreen(onBack = { nav.popBackStack() })

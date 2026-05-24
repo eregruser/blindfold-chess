@@ -27,6 +27,7 @@ fun SettingsScreen(
     onOpenPreferences: () -> Unit,
     onOpenBoard: () -> Unit,
     onOpenVoiceCommands: () -> Unit,
+    onOpenAbout: () -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -62,6 +63,12 @@ fun SettingsScreen(
                 headlineContent = { Text("Voice commands") },
                 supportingContent = { Text("Cheat sheet of every phrase the recognizer accepts") },
                 modifier = Modifier.clickable(onClick = onOpenVoiceCommands),
+            )
+            HorizontalDivider()
+            ListItem(
+                headlineContent = { Text("About") },
+                supportingContent = { Text("Version, source code, privacy policy, licenses") },
+                modifier = Modifier.clickable(onClick = onOpenAbout),
             )
             HorizontalDivider()
             ListItem(
