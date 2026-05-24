@@ -142,17 +142,19 @@ A settings screen must include a "headphone button test" page that logs every re
 - Stockfish 18 evaluation requires two NNUE files: `EvalFile` (~104 MB, "big") and
   `EvalFileSmall` (~3.4 MB). The default filenames are defined in
   `stockfish/src/evaluate.h` and pinned per release.
-- Bundled as APK assets under `app/src/main/assets/` and extracted to internal
-  storage on first use by `EngineAssets.kt`; then injected via
+- Shipped in the `:engineassets` Play Asset Delivery install-time pack
+  (`engineassets/src/main/assets/nn-*.nnue`). At runtime, `EngineAssets.kt`
+  extracts them to internal storage on first use; the engine loads via
   `setoption name EvalFile value <abs-path>`.
 - **Not** checked into git (gitignored by `*.nnue` pattern) — they're large
   binaries fetched separately. After a fresh clone:
   ```bash
   ./scripts/fetch_nnue.sh
   ```
-  This downloads from `tests.stockfishchess.org`.
-- APK size impact: ~108 MB. Acceptable for sideloaded dev builds. For Play
-  Store distribution this should move to Play Asset Delivery before v1.0.
+  This downloads from `tests.stockfishchess.org` into the asset pack module.
+- Base APK size impact: zero — the pack ships separately as install-time
+  delivery from Play Store. Dev/debug builds bundle the assets into the debug
+  APK directly so Android Studio "Run" works as before.
 - AGP `noCompress += "nnue"` to avoid re-compressing already-quantized weights.
 
 ### Vosk

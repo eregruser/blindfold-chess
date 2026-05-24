@@ -17,4 +17,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "BlindfoldChess"
-include(":app")
+include(":app", ":engineassets")

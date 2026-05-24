@@ -22,9 +22,10 @@ https://www.gnu.org/licenses/gpl-3.0.html).
 
 ## Stockfish NNUE network files
 
-Bundled in `app/src/main/assets/nn-*.nnue` (gitignored; fetched via
-`scripts/fetch_nnue.sh`). Distributed by the Stockfish project; weights are part of
-the engine release and inherit its GPLv3 license.
+Bundled in `engineassets/src/main/assets/nn-*.nnue` (gitignored; fetched via
+`scripts/fetch_nnue.sh`). Distributed as a Play Asset Delivery install-time pack so
+they don't bloat the base APK. Distributed by the Stockfish project; weights are part
+of the engine release and inherit its GPLv3 license.
 
 ## Vosk speech recognition
 
@@ -33,8 +34,10 @@ the engine release and inherit its GPLv3 license.
 
 ## Vosk small English model
 
-Bundled as `app/src/main/assets/vosk-model-small-en-us-0.15/` (gitignored; fetched via
-`scripts/fetch_vosk.sh`). Distributed by Alpha Cephei under **Apache License 2.0**.
+Bundled as `engineassets/src/main/assets/vosk-model-small-en-us-0.15/` (gitignored;
+fetched via `scripts/fetch_vosk.sh`). Distributed as part of the same Play Asset
+Delivery install-time pack as the NNUE files. Distributed by Alpha Cephei under
+**Apache License 2.0**.
 
 ## chesslib (UCI → SAN conversion)
 

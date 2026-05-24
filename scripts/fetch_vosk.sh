@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# Download and extract the small English Vosk model into app/src/main/assets/
-# where VoskRecognizer expects it. Run this once after fresh clone (the
-# extracted model is gitignored — too large for git).
+# Download and extract the small English Vosk model into the engineassets
+# asset-pack module where AssetManager / VoskRecognizer expects it. Run this
+# once after fresh clone (the extracted model is gitignored — too large for git).
 
 set -euo pipefail
 
-ASSETS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/app/src/main/assets"
+ASSETS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/engineassets/src/main/assets"
 MODEL_NAME="vosk-model-small-en-us-0.15"
 ARCHIVE_URL="https://alphacephei.com/vosk/models/${MODEL_NAME}.zip"
 

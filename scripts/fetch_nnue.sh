@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Download the NNUE network files for Stockfish 18 (sf_18) into
-# app/src/main/assets/ where the app's EngineAssets helper expects them.
+# Download the NNUE network files for Stockfish 18 (sf_18) into the engineassets
+# asset-pack module where AssetManager / EngineAssets expects them.
 #
 # Run this once after fresh clone (the .nnue files are gitignored because
 # they're ~108MB combined and don't belong in git history).
 
 set -euo pipefail
 
-ASSETS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/app/src/main/assets"
+ASSETS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/engineassets/src/main/assets"
 mkdir -p "$ASSETS_DIR"
 
 # Filenames match EvalFileDefaultNameBig / EvalFileDefaultNameSmall in

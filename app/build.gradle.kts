@@ -38,6 +38,12 @@ android {
         }
     }
 
+    // Stockfish NNUE network files (~108MB) and the Vosk speech model (~68MB) live in a
+    // separate install-time asset pack so the base APK stays under Play Store's 200MB limit.
+    // AssetManager merges pack assets into the app's namespace at runtime; the existing
+    // EngineAssets and VoskRecognizer code uses them transparently.
+    assetPacks += setOf(":engineassets")
+
     buildTypes {
         release {
             isMinifyEnabled = false
