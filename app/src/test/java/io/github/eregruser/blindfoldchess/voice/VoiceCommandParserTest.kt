@@ -66,26 +66,26 @@ class VoiceCommandParserTest {
         assertEquals(VoiceCommand.ReadMoves, parser.parse("read the moves"))
     }
 
-    @Test fun whatsOnWithApostrophe() {
-        assertEquals(VoiceCommand.WhatsOn("e3"), parser.parse("what's on echo three"))
+    @Test fun describeSquareNato() {
+        assertEquals(VoiceCommand.DescribeSquare("e3"), parser.parse("describe square echo three"))
+        assertEquals(VoiceCommand.DescribeSquare("h8"), parser.parse("describe square hotel eight"))
+        assertEquals(VoiceCommand.DescribeSquare("d4"), parser.parse("describe square delta four"))
     }
 
-    @Test fun whatsOnNoApostrophe() {
-        assertEquals(VoiceCommand.WhatsOn("a1"), parser.parse("whats on alpha one"))
+    @Test fun describeSquareWithLetterFile() {
+        assertEquals(VoiceCommand.DescribeSquare("f3"), parser.parse("describe square f three"))
     }
 
-    @Test fun whatIsOn() {
-        assertEquals(VoiceCommand.WhatsOn("h8"), parser.parse("what is on hotel eight"))
-        assertEquals(VoiceCommand.WhatsOn("d4"), parser.parse("what is on delta four"))
+    @Test fun describeSquareRejectsBadSquare() {
+        assertNull(parser.parse("describe square alpha nine"))
+        assertNull(parser.parse("describe square bogus square"))
     }
 
-    @Test fun whatsOnWithLetterFile() {
-        assertEquals(VoiceCommand.WhatsOn("f3"), parser.parse("whats on f three"))
-    }
-
-    @Test fun whatsOnRejectsBadSquare() {
-        assertNull(parser.parse("whats on alpha nine"))
-        assertNull(parser.parse("what is on bogus square"))
+    @Test fun rejectsLegacyWhatsOnPhrasing() {
+        // The earlier "what is on" / "whats on" phrasings were retired because the
+        // "on" token collided acoustically with "one" in the small Vosk model.
+        assertNull(parser.parse("whats on alpha one"))
+        assertNull(parser.parse("what is on hotel eight"))
     }
 
     @Test fun returnsNullForUnparseable() {

@@ -427,7 +427,7 @@ class GameController(
             VoiceCommand.DescribeBoard -> handleDescribeBoard()
             VoiceCommand.Resign -> handleResign()
             VoiceCommand.NewGame -> handleNewGame()
-            is VoiceCommand.WhatsOn -> handleWhatsOn(command.square)
+            is VoiceCommand.DescribeSquare -> handleDescribeSquare(command.square)
             VoiceCommand.ReadMoves -> handleReadMoves()
         }
     }
@@ -546,7 +546,7 @@ class GameController(
         }
     }
 
-    private suspend fun handleWhatsOn(square: String) = gameLock.withLock {
+    private suspend fun handleDescribeSquare(square: String) = gameLock.withLock {
         val board = engine.currentBoard()
         val piece = board.pieceAt(square)
         val spokenSquare = squareToSpoken(square)

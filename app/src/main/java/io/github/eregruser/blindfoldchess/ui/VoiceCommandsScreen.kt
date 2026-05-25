@@ -136,9 +136,8 @@ private val QUERIES = listOf(
         description = "Announce full-move count.",
     ),
     CommandHelp(
-        phrase = "what is on echo three",
-        description = "Announce the piece on the named square (or \"empty\"). Also: " +
-            "\"whats on echo three\".",
+        phrase = "describe square echo three",
+        description = "Announce the piece on the named square (or \"empty\").",
     ),
     CommandHelp(
         phrase = "list my pieces",

@@ -124,7 +124,7 @@ class ChessGrammarTest {
         // The dynamic legal-move grammar exists specifically to give Vosk a much
         // smaller acoustic search space than the full-board enumeration. Assert
         // that intent directly rather than against an absolute byte threshold —
-        // the legal grammar legitimately grew past 1KB once the "what is on
+        // the legal grammar legitimately grew past 1KB once the "describe square
         // <file> <rank>" 64-square matrix was added, but it is still ~200x
         // smaller than fullBoard's full move enumeration.
         assertTrue(

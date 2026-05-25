@@ -34,8 +34,8 @@ sealed class VoiceCommand {
     /** "new game" — reset to startpos. */
     object NewGame : VoiceCommand()
 
-    /** "what is on <square>" — announce piece (or empty) at the named square. */
-    data class WhatsOn(val square: String) : VoiceCommand()
+    /** "describe square <file> <rank>" — announce piece (or empty) at the named square. */
+    data class DescribeSquare(val square: String) : VoiceCommand()
 
     /** "read moves" — TTS every move in chronological order with a pause between each. */
     object ReadMoves : VoiceCommand()
@@ -48,7 +48,7 @@ class VoiceCommandParser(private val moveParser: MoveParser = MoveParser()) {
         if (tokens.isEmpty()) return null
 
         parseExactCommand(tokens)?.let { return it }
-        parseWhatsOn(tokens)?.let { return it }
+        parseDescribeSquare(tokens)?.let { return it }
 
         // Fall through to move parsing
         return moveParser.parse(input)?.let { VoiceCommand.Move(it) }
@@ -66,20 +66,18 @@ class VoiceCommandParser(private val moveParser: MoveParser = MoveParser()) {
     }
 
     /**
-     * Patterns:
-     *   "what is on <file> <rank>"
-     *   "whats on <file> <rank>"      (apostrophe stripped in tokenize)
+     * Pattern: "describe square <file> <rank>"
+     *
+     * The original phrasings ("what is on" / "whats on") were dropped because the
+     * "on" token was acoustically near-identical to "one" in the small Vosk model,
+     * causing the recognizer to mis-emit "whats one echo three" → unparseable. The
+     * "describe" prefix also pairs with the existing "describe board" command.
      */
-    private fun parseWhatsOn(tokens: List<String>): VoiceCommand.WhatsOn? {
-        val squareTokens = when {
-            tokens.size == 4 && tokens[0] == "whats" && tokens[1] == "on" ->
-                tokens.subList(2, 4)
-            tokens.size == 5 && tokens[0] == "what" && tokens[1] == "is" && tokens[2] == "on" ->
-                tokens.subList(3, 5)
-            else -> return null
-        }
-        val square = parseSquare(squareTokens) ?: return null
-        return VoiceCommand.WhatsOn(square)
+    private fun parseDescribeSquare(tokens: List<String>): VoiceCommand.DescribeSquare? {
+        if (tokens.size != 4) return null
+        if (tokens[0] != "describe" || tokens[1] != "square") return null
+        val square = parseSquare(tokens.subList(2, 4)) ?: return null
+        return VoiceCommand.DescribeSquare(square)
     }
 
     private fun parseSquare(tokens: List<String>): String? {

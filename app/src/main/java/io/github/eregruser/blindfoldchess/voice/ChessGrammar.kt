@@ -46,11 +46,13 @@ object ChessGrammar {
         for (uci in legalMoves) phrases.addAll(phrasingsFor(uci))
         // Always-available commands
         phrases.addAll(COMMAND_PHRASES)
-        // "what is on <file> <rank>" / "whats on <file> <rank>" for every square
+        // "describe square <file> <rank>" for every square. The earlier "what is on"
+        // phrasing was dropped because the "on" token collided acoustically with
+        // "one" in the small Vosk model; the new prefix is unambiguous and matches
+        // the existing "describe board" command's verb.
         for (fileWord in NATO_FILES.values) {
             for (rankWord in RANK_WORDS.values) {
-                phrases.add("whats on $fileWord $rankWord")
-                phrases.add("what is on $fileWord $rankWord")
+                phrases.add("describe square $fileWord $rankWord")
             }
         }
         phrases.add("[unk]")
