@@ -152,7 +152,9 @@ fun MainScreen(onOpenSettings: () -> Unit) {
             ) {
                 if (gameState.moves.isEmpty()) {
                     Text(
-                        if (serviceState.gameActive) "No moves yet — tap your headset to play."
+                        if (serviceState.gameActive)
+                            "No moves yet — tap your headset (or Speak below) and say a move, " +
+                                "e.g. \"echo two echo four\"."
                         else "Start a game to begin.",
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(8.dp),
@@ -275,7 +277,14 @@ private fun ResumeCard(
 @Composable
 private fun HelpText() {
     Text(
-        "Headset bindings while a game is active:\n" +
+        "Speaking moves — NATO file names only:\n" +
+            "  • \"echo two echo four\"  →  e2-e4\n" +
+            "  • Files:  alpha bravo charlie delta echo foxtrot golf hotel\n" +
+            "  • Castling: \"castle king side\" / \"castle queen side\"\n" +
+            "Standard notation (\"e four\", \"knight f three\") is NOT accepted — " +
+            "the recognizer is locked to NATO for accuracy. Full command list in " +
+            "Settings → Voice commands.\n\n" +
+            "Headset bindings while a game is active:\n" +
             "  • play/pause  →  open listen window (tap, speak move, pause)\n" +
             "  • next        →  re-speak last engine move\n" +
             "  • previous    →  cancel current listen window\n\n" +
