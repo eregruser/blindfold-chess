@@ -37,6 +37,14 @@ class ChessGameService : Service() {
     data class State(
         val gameActive: Boolean = false,
         val testModeActive: Boolean = false,
+        /**
+         * True iff we currently hold AUDIOFOCUS_GAIN and are running the silent A2DP
+         * keepalive. When false (i.e. another media app took focus) the game state is
+         * still alive but headset taps no longer reach us — they go to the music app.
+         * The user can keep playing via on-screen Speak / tap-to-move, and bring this
+         * back true by returning to the app (MainActivity.onResume re-requests focus).
+         */
+        val headsetRoutingActive: Boolean = false,
     ) {
         val sessionActive: Boolean get() = gameActive || testModeActive
     }
@@ -72,11 +80,18 @@ class ChessGameService : Service() {
         sessionAudio = SessionAudio(
             applicationContext,
             onPermanentLoss = {
-                Log.w(TAG, "SessionAudio reported permanent focus loss; ending session")
-                gameController.stopGame()
-                updateState { State() }
+                // Another media app (YouTube, Spotify, podcast, …) has taken focus. We
+                // lose headset routing because AVRCP follows whichever app is currently
+                // streaming over A2DP, but the game state itself is fine to retain — the
+                // user can still play via on-screen Speak + tap-to-move. Focus comes
+                // back when they foreground us (MainActivity.onResume → ACTION_TRY_REACQUIRE_FOCUS)
+                // or when the music app voluntarily releases focus.
+                Log.w(TAG, "Audio focus permanently lost; headset routing paused (game retained)")
+                updateState { copy(headsetRoutingActive = false) }
             },
             onFocusRegained = {
+                Log.i(TAG, "Audio focus regained; headset routing restored")
+                updateState { copy(headsetRoutingActive = true) }
                 gameController.onFocusRegained()
             },
         )
@@ -146,6 +161,21 @@ class ChessGameService : Service() {
             ACTION_CANCEL_LISTEN_WINDOW -> gameController.cancelListenWindow()
             ACTION_ENABLE_TEST_MODE -> updateState { copy(testModeActive = true) }
             ACTION_DISABLE_TEST_MODE -> updateState { copy(testModeActive = false) }
+            ACTION_TRY_REACQUIRE_FOCUS -> {
+                // Triggered by MainActivity.onResume after the user returns to the app.
+                // Only meaningful while a session is active but headset routing is paused.
+                val st = _state.value
+                if (st.sessionActive && !st.headsetRoutingActive) {
+                    val granted = sessionAudio.tryReacquire()
+                    if (granted) {
+                        Log.i(TAG, "tryReacquireFocus: granted")
+                        updateState { copy(headsetRoutingActive = true) }
+                        gameController.onFocusRegained()
+                    } else {
+                        Log.d(TAG, "tryReacquireFocus: not granted (another app likely still holds focus)")
+                    }
+                }
+            }
             else -> Log.w(TAG, "Unknown start action: ${intent?.action}")
         }
         return START_NOT_STICKY
@@ -173,9 +203,17 @@ class ChessGameService : Service() {
         val next = transform(previous)
         if (next == previous) return
         _state.value = next
-        mediaSession.isActive = next.sessionActive
+        // The MediaSession only routes headset events to us while we hold focus —
+        // gating its active flag on both keeps it from sitting in a weird half-state
+        // where the system thinks we own headset routing but we actually don't.
+        mediaSession.isActive = next.sessionActive && next.headsetRoutingActive
         if (next.sessionActive && !previous.sessionActive) {
-            sessionAudio.acquire()
+            val granted = sessionAudio.acquire()
+            // Reflect the synchronous acquire result. The async listener will further
+            // update this on subsequent GAIN/LOSS events. updateState is re-entrant via
+            // the equality short-circuit: the next call only changes headsetRoutingActive,
+            // so the "started session" branch above won't fire again.
+            updateState { copy(headsetRoutingActive = granted) }
         } else if (!next.sessionActive && previous.sessionActive) {
             sessionAudio.release()
         }
@@ -304,6 +342,7 @@ class ChessGameService : Service() {
         private const val ACTION_CANCEL_LISTEN_WINDOW = "io.github.eregruser.blindfoldchess.action.CANCEL_LISTEN_WINDOW"
         private const val ACTION_ENABLE_TEST_MODE = "io.github.eregruser.blindfoldchess.action.ENABLE_TEST_MODE"
         private const val ACTION_DISABLE_TEST_MODE = "io.github.eregruser.blindfoldchess.action.DISABLE_TEST_MODE"
+        private const val ACTION_TRY_REACQUIRE_FOCUS = "io.github.eregruser.blindfoldchess.action.TRY_REACQUIRE_FOCUS"
         private const val EXTRA_GAME_ID = "gameId"
         private const val EXTRA_MOVE_UCI = "moveUci"
 
@@ -341,6 +380,19 @@ class ChessGameService : Service() {
 
         /** Cancels a listen window from the on-screen Cancel button. */
         fun cancelListenWindow(context: Context) = dispatch(context, ACTION_CANCEL_LISTEN_WINDOW)
+
+        /**
+         * Try to re-acquire audio focus after a permanent loss. Called by
+         * MainActivity.onResume — if the user is returning to the app after playing
+         * something elsewhere, this gives the music app a chance to lose focus to us
+         * again so headset routing comes back. No-op when there's no active session or
+         * we already hold focus, so it's safe to call unconditionally on every resume.
+         */
+        fun tryReacquireFocus(context: Context) {
+            val st = _state.value
+            if (!st.sessionActive || st.headsetRoutingActive) return
+            dispatch(context, ACTION_TRY_REACQUIRE_FOCUS)
+        }
 
         private fun dispatch(context: Context, action: String) {
             val intent = Intent(context, ChessGameService::class.java).setAction(action)

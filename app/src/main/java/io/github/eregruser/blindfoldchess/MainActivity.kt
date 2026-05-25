@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import io.github.eregruser.blindfoldchess.service.ChessGameService
 import io.github.eregruser.blindfoldchess.ui.AppNavHost
 import io.github.eregruser.blindfoldchess.ui.theme.BlindfoldChessTheme
 
@@ -24,6 +25,14 @@ class MainActivity : ComponentActivity() {
                 AppNavHost()
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // If the user just returned from a music/video app that stole audio focus,
+        // try to win it back so headset routing reaches us again. No-op when no
+        // session is active or focus is already held.
+        ChessGameService.tryReacquireFocus(this)
     }
 
     private fun maybeRequestNotificationPermission() {

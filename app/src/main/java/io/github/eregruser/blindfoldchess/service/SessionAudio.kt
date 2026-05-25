@@ -49,31 +49,64 @@ class SessionAudio(
 
     @Volatile
     private var streaming = false
-    private var acquired = false
+    // requested: the session lifecycle flag — true between acquire() and release(),
+    //   regardless of whether the system has currently granted us focus.
+    // held: true iff we currently hold AUDIOFOCUS_GAIN. Goes false on permanent loss
+    //   (AUDIOFOCUS_LOSS) but `requested` stays true so the listener still processes a
+    //   later AUDIOFOCUS_GAIN as a regain rather than a stray event.
+    private var requested = false
+    private var held = false
+
+    /** True iff we currently hold AUDIOFOCUS_GAIN. Reflects the latest focus listener event. */
+    val focusHeld: Boolean
+        @Synchronized get() = held
 
     @Synchronized
     fun acquire(): Boolean {
-        if (acquired) return true
-        acquired = true
+        if (requested && held) return true
+        requested = true
         val result = audioManager.requestAudioFocus(focusRequest)
-        if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+        val granted = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        held = granted
+        if (granted) {
+            startSilentStream()
+        } else {
             Log.w(TAG, "AUDIOFOCUS_GAIN request not granted (result=$result)")
         }
-        startSilentStream()
-        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        return granted
+    }
+
+    /**
+     * Re-request focus after a permanent loss. Distinct from [acquire] because the
+     * `requested` flag is already set — this just lodges a fresh request with the system
+     * to try to win focus back from whichever app currently holds it. Returns true if the
+     * system granted focus synchronously.
+     */
+    @Synchronized
+    fun tryReacquire(): Boolean {
+        if (!requested) return false
+        if (held) return true
+        val result = audioManager.requestAudioFocus(focusRequest)
+        val granted = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        if (granted) {
+            held = true
+            startSilentStream()
+        }
+        return granted
     }
 
     @Synchronized
     fun release() {
-        if (!acquired) return
-        acquired = false
+        if (!requested) return
+        requested = false
+        held = false
         stopSilentStream()
         audioManager.abandonAudioFocusRequest(focusRequest)
     }
 
     @Synchronized
     private fun handleFocusChange(change: Int) {
-        if (!acquired) return
+        if (!requested) return
         when (change) {
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
@@ -82,14 +115,16 @@ class SessionAudio(
             }
             AudioManager.AUDIOFOCUS_GAIN -> {
                 Log.d(TAG, "Focus regained; resuming keepalive")
+                held = true
                 startSilentStream()
                 onFocusRegained()
             }
             AudioManager.AUDIOFOCUS_LOSS -> {
-                Log.w(TAG, "Permanent focus loss; signalling session end")
+                Log.w(TAG, "Permanent focus loss; headset routing paused (session retained)")
+                held = false
                 stopSilentStream()
-                acquired = false
-                // Don't abandon focus here — the system already revoked it.
+                // Don't abandon focus here — the system already revoked it, but we keep
+                // the listener registered so a later AUDIOFOCUS_GAIN reaches us.
                 onPermanentLoss()
             }
             else -> Log.d(TAG, "AudioFocus change=$change (no specific handling)")

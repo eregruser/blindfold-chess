@@ -111,6 +111,17 @@ fun MainScreen(onOpenSettings: () -> Unit) {
         ) {
             StatusRow(gameState, serviceState.gameActive)
 
+            // Headset routing pauses when another media app takes focus (YouTube,
+            // podcast, etc.). The game state is fine to retain — surface a hint
+            // explaining that voice is on hold but tap-to-move still works.
+            if (serviceState.gameActive && !serviceState.headsetRoutingActive) {
+                Text(
+                    "Voice paused — another app is using audio focus. Open the board to play by tap, or return to this app to resume voice.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
+
             resumeCandidate?.let { candidate ->
                 ResumeCard(
                     game = candidate,
@@ -291,14 +302,19 @@ private fun ControlRow(
             serviceState.gameActive -> {
                 Button(onClick = onStopGame) { Text("Stop game") }
                 // Same gesture as a headset tap: opens a listen window when it's the user's
-                // turn, cancels when already listening. Disabled mid-search.
+                // turn, cancels when already listening. Disabled mid-search and while
+                // another app holds audio focus (headset taps go to that app anyway, and
+                // running ASR without focus produces a confusing experience where TTS
+                // collides with the music app's output).
+                val voiceAvailable = serviceState.headsetRoutingActive
                 when (gameState.status) {
                     GameController.Status.Listening -> Button(onClick = onCancelSpeak) {
                         Text("Cancel")
                     }
-                    GameController.Status.WaitingForUser -> Button(onClick = onSpeak) {
-                        Text("Speak")
-                    }
+                    GameController.Status.WaitingForUser -> Button(
+                        onClick = onSpeak,
+                        enabled = voiceAvailable,
+                    ) { Text("Speak") }
                     else -> Button(onClick = onSpeak, enabled = false) { Text("Speak") }
                 }
             }
