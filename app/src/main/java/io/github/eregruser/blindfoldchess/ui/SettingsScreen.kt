@@ -23,11 +23,13 @@ import androidx.compose.ui.res.stringResource
 import io.github.eregruser.blindfoldchess.R
 
 /**
- * Settings index. Items are grouped by frequency of use rather than alphabetically:
+ * Settings index. Items are grouped by purpose:
  *   1. Everyday — Game preferences, Game history, Board view, Voice commands.
- *   2. Meta — Send feedback, About.
- *   3. Diagnostics — Headphone button test, Engine self-test, Voice test.
- * No section headers (only 9 items total); the grouping is conveyed by order.
+ *   2. Diagnostics — Headphone button test, Engine self-test, Voice test.
+ *   3. Meta — Send feedback, About.
+ * About lives at the bottom by Android convention (users reflexively scroll there for
+ * version / source / privacy). No section headers since 9 items doesn't justify the
+ * visual weight; the grouping is conveyed by order alone.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,6 +90,26 @@ fun SettingsScreen(
             )
             HorizontalDivider()
 
+            // --- Diagnostics ---
+            ListItem(
+                headlineContent = { Text("Headphone button test") },
+                supportingContent = { Text("Log every media key event received from a connected headset") },
+                modifier = Modifier.clickable(onClick = onOpenHeadphoneTest),
+            )
+            HorizontalDivider()
+            ListItem(
+                headlineContent = { Text("Engine self-test") },
+                supportingContent = { Text("Load embedded Stockfish and drive it via UCI commands") },
+                modifier = Modifier.clickable(onClick = onOpenEngineSelfTest),
+            )
+            HorizontalDivider()
+            ListItem(
+                headlineContent = { Text("Voice test") },
+                supportingContent = { Text("Bare Vosk ASR — see what the recognizer hears") },
+                modifier = Modifier.clickable(onClick = onOpenVoiceTest),
+            )
+            HorizontalDivider()
+
             // --- Meta ---
             ListItem(
                 headlineContent = { Text("Send feedback") },
@@ -106,26 +128,6 @@ fun SettingsScreen(
                 headlineContent = { Text("About") },
                 supportingContent = { Text("Version, source code, privacy policy, licenses") },
                 modifier = Modifier.clickable(onClick = onOpenAbout),
-            )
-            HorizontalDivider()
-
-            // --- Diagnostics ---
-            ListItem(
-                headlineContent = { Text("Headphone button test") },
-                supportingContent = { Text("Log every media key event received from a connected headset") },
-                modifier = Modifier.clickable(onClick = onOpenHeadphoneTest),
-            )
-            HorizontalDivider()
-            ListItem(
-                headlineContent = { Text("Engine self-test") },
-                supportingContent = { Text("Load embedded Stockfish and drive it via UCI commands") },
-                modifier = Modifier.clickable(onClick = onOpenEngineSelfTest),
-            )
-            HorizontalDivider()
-            ListItem(
-                headlineContent = { Text("Voice test") },
-                supportingContent = { Text("Bare Vosk ASR — see what the recognizer hears") },
-                modifier = Modifier.clickable(onClick = onOpenVoiceTest),
             )
             HorizontalDivider()
         }
