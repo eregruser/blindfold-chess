@@ -121,8 +121,16 @@ class ChessGrammarTest {
 
     @Test fun legalGrammarSmallerThanFullBoard() {
         val small = ChessGrammar.legal(listOf("e2e4", "d2d4", "g1f3", "b1c3"))
-        // Should be a few hundred bytes, far smaller than fullBoard's ~750KB
-        assertTrue("legal size=${small.length}", small.length < 1_000)
+        // The dynamic legal-move grammar exists specifically to give Vosk a much
+        // smaller acoustic search space than the full-board enumeration. Assert
+        // that intent directly rather than against an absolute byte threshold —
+        // the legal grammar legitimately grew past 1KB once the "what is on
+        // <file> <rank>" 64-square matrix was added, but it is still ~200x
+        // smaller than fullBoard's full move enumeration.
+        assertTrue(
+            "legal size=${small.length}, fullBoard size=${ChessGrammar.fullBoard.length}",
+            small.length * 10 < ChessGrammar.fullBoard.length,
+        )
     }
 
     private fun countOccurrences(s: String, sub: String): Int {
