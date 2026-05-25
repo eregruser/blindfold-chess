@@ -176,10 +176,29 @@ class GameController(
             _state.update { it.copy(status = Status.Error, message = "Game $gameId not found") }
             return@withLock
         }
-        if (game.completedAt != null) {
-            Log.w(TAG, "resumeGame: game $gameId is already completed")
+        // Abandoned games can be revived; truly finished games (Win/Loss/Draw) cannot —
+        // "resume" doesn't make sense once mate/stalemate has been reached. The
+        // un-abandon (markUnfinished) is deferred until AFTER abandoning any other
+        // active game, otherwise abandonAnyActiveGame would target the row we just
+        // un-completed and immediately re-abandon it.
+        val isResumableAbandoned = game.completedAt != null && runCatching {
+            GameResult.valueOf(game.result)
+        }.getOrDefault(GameResult.InProgress) == GameResult.Abandoned
+        if (game.completedAt != null && !isResumableAbandoned) {
+            Log.w(TAG, "resumeGame: game $gameId has terminal result ${game.result}")
             _state.update { it.copy(status = Status.Error, message = "Game already finished") }
             return@withLock
+        }
+        // If a different game is currently active, abandon it first so the active-row
+        // slot is free for our target.
+        val active = repo.findActive()
+        if (active != null && active.id != gameId) {
+            Log.i(TAG, "resumeGame: abandoning other active game ${active.id} to switch to $gameId")
+            repo.markComplete(active.id, GameResult.Abandoned)
+        }
+        if (isResumableAbandoned) {
+            Log.i(TAG, "resumeGame: un-abandoning game $gameId")
+            repo.markUnfinished(gameId)
         }
 
         _state.update { State(status = Status.Loading, message = "Resuming game...") }

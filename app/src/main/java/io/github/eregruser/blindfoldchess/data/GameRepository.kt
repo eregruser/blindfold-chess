@@ -34,4 +34,6 @@ class GameRepository(private val dao: GameDao) {
     fun observeCompleted(): Flow<List<GameEntity>> = dao.observeCompleted()
 
     suspend fun delete(id: Long) = dao.deleteById(id)
+
+    suspend fun markUnfinished(id: Long) = dao.markUnfinished(id)
 }

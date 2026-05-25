@@ -30,4 +30,9 @@ interface GameDao {
 
     @Query("DELETE FROM games WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    /** Clear the completedAt + result columns so the game becomes the active in-progress
+     *  row again. Used by resume-from-history for Abandoned games. */
+    @Query("UPDATE games SET completedAt = NULL, result = 'InProgress' WHERE id = :id")
+    suspend fun markUnfinished(id: Long)
 }

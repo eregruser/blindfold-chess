@@ -8,10 +8,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -34,9 +38,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.eregruser.blindfoldchess.BlindfoldChessApp
 import io.github.eregruser.blindfoldchess.chess.SanConverter
 import io.github.eregruser.blindfoldchess.data.GameEntity
+import io.github.eregruser.blindfoldchess.data.GameResult
+import io.github.eregruser.blindfoldchess.service.ChessGameService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -47,6 +54,7 @@ fun GameDetailScreen(gameId: Long, onBack: () -> Unit) {
     val context = LocalContext.current
     val app = context.applicationContext as BlindfoldChessApp
     val scope = rememberCoroutineScope()
+    val serviceState by ChessGameService.state.collectAsStateWithLifecycle()
     var game by remember { mutableStateOf<GameEntity?>(null) }
     var loaded by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -100,15 +108,33 @@ fun GameDetailScreen(gameId: Long, onBack: () -> Unit) {
         when {
             !loaded -> CenteredSpinner(padding)
             game == null -> CenteredMessage(padding, "Game $gameId not found.")
-            else -> DetailBody(game!!, padding)
+            else -> DetailBody(
+                game = game!!,
+                padding = padding,
+                gameActive = serviceState.gameActive,
+                onResume = {
+                    ChessGameService.resumeGame(context, gameId)
+                    onBack()
+                },
+            )
         }
     }
 }
 
 @Composable
-private fun DetailBody(game: GameEntity, padding: androidx.compose.foundation.layout.PaddingValues) {
+private fun DetailBody(
+    game: GameEntity,
+    padding: androidx.compose.foundation.layout.PaddingValues,
+    gameActive: Boolean,
+    onResume: () -> Unit,
+) {
     val moves = game.movesUci.split(' ').filter { it.isNotBlank() }
     val fullMoves = (moves.size + 1) / 2
+    // Resume is only meaningful for Abandoned games and only when no other game is
+    // currently active in the service. The user can stop their active game from the
+    // main screen to unblock the button.
+    val isAbandoned = runCatching { GameResult.valueOf(game.result) }
+        .getOrDefault(GameResult.InProgress) == GameResult.Abandoned
 
     Column(
         modifier = Modifier
@@ -132,6 +158,19 @@ private fun DetailBody(game: GameEntity, padding: androidx.compose.foundation.la
             "Skill ${game.skillLevel} · Played as ${game.userColor} · $fullMoves full moves",
             style = MaterialTheme.typography.bodyMedium,
         )
+
+        if (isAbandoned) {
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onResume, enabled = !gameActive) { Text("Resume") }
+            }
+            if (gameActive) {
+                Text(
+                    "Stop the current game from the main screen to resume this one.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
 
         HorizontalDivider()
 
