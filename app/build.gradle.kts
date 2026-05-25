@@ -20,12 +20,12 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.blindfoldchess.app"
+    namespace = "io.github.eregruser.blindfoldchess"
     compileSdk = 35
     ndkVersion = "30.0.14904198"
 
     defaultConfig {
-        applicationId = "com.blindfoldchess.app"
+        applicationId = "io.github.eregruser.blindfoldchess"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

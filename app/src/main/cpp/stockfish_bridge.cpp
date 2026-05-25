@@ -81,7 +81,7 @@ void run_engine(int stdin_read_fd, int stdout_write_fd) {
 extern "C" {
 
 JNIEXPORT jboolean JNICALL
-Java_com_blindfoldchess_app_engine_StockfishJni_nativeStart(JNIEnv* /*env*/, jclass /*cls*/) {
+Java_io_github_eregruser_blindfoldchess_engine_StockfishJni_nativeStart(JNIEnv* /*env*/, jclass /*cls*/) {
     bool expected = false;
     if (!g_initialized.compare_exchange_strong(expected, true)) {
         LOGW("nativeStart called while already initialized");
@@ -115,7 +115,7 @@ Java_com_blindfoldchess_app_engine_StockfishJni_nativeStart(JNIEnv* /*env*/, jcl
 }
 
 JNIEXPORT void JNICALL
-Java_com_blindfoldchess_app_engine_StockfishJni_nativeWrite(JNIEnv* env, jclass /*cls*/, jstring jcommand) {
+Java_io_github_eregruser_blindfoldchess_engine_StockfishJni_nativeWrite(JNIEnv* env, jclass /*cls*/, jstring jcommand) {
     if (g_command_write_fd < 0 || jcommand == nullptr) return;
     const char* cmd = env->GetStringUTFChars(jcommand, nullptr);
     if (cmd == nullptr) return;
@@ -129,7 +129,7 @@ Java_com_blindfoldchess_app_engine_StockfishJni_nativeWrite(JNIEnv* env, jclass 
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_blindfoldchess_app_engine_StockfishJni_nativeReadLine(JNIEnv* env, jclass /*cls*/) {
+Java_io_github_eregruser_blindfoldchess_engine_StockfishJni_nativeReadLine(JNIEnv* env, jclass /*cls*/) {
     if (g_response_read_fd < 0) return nullptr;
 
     std::string line;
@@ -153,7 +153,7 @@ Java_com_blindfoldchess_app_engine_StockfishJni_nativeReadLine(JNIEnv* env, jcla
 }
 
 JNIEXPORT void JNICALL
-Java_com_blindfoldchess_app_engine_StockfishJni_nativeStop(JNIEnv* /*env*/, jclass /*cls*/) {
+Java_io_github_eregruser_blindfoldchess_engine_StockfishJni_nativeStop(JNIEnv* /*env*/, jclass /*cls*/) {
     if (g_command_write_fd >= 0) {
         // Best-effort: ask the engine to quit cleanly, then close to signal EOF.
         const char* quit = "quit\n";
