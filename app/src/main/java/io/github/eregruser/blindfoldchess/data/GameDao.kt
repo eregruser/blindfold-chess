@@ -27,4 +27,7 @@ interface GameDao {
     /** All completed games (most recently completed first). */
     @Query("SELECT * FROM games WHERE completedAt IS NOT NULL ORDER BY completedAt DESC")
     fun observeCompleted(): Flow<List<GameEntity>>
+
+    @Query("DELETE FROM games WHERE id = :id")
+    suspend fun deleteById(id: Long)
 }
